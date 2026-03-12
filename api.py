@@ -85,16 +85,72 @@ def landing():
     return send_from_directory(app.static_folder, "index.html")
 
 
+@app.route("/api")
+@app.route("/api/")
+def api_docs():
+    return send_from_directory(app.static_folder, "api.html")
+
+
 @app.route("/miniapp")
 @app.route("/miniapp/")
 def miniapp():
     return send_from_directory(app.static_folder, "miniapp.html")
 
 
-@app.route("/api")
-@app.route("/api/")
-def api_docs():
-    return send_from_directory(app.static_folder, "api.html")
+# ── MINI APP (no API key — user_id comes from Telegram initData) ──
+
+@app.route("/api/miniapp/packs")
+def miniapp_packs():
+    user_id = request.args.get("user_id", "").strip()
+    if not user_id or not user_id.isdigit():
+        return err("Missing or invalid user_id", 400, "missing_param")
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT name, title FROM packs WHERE user_id = ? ORDER BY id", (int(user_id),))
+    rows = c.fetchall()
+    conn.close()
+    return ok([
+        {"name": r["name"], "title": r["title"],
+         "link": f"https://t.me/addstickers/{r['name']}"}
+        for r in rows
+    ])
+
+
+@app.route("/api/miniapp/settings")
+def miniapp_settings_get():
+    user_id = request.args.get("user_id", "").strip()
+    if not user_id or not user_id.isdigit():
+        return err("Missing or invalid user_id", 400, "missing_param")
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT mask_inverted FROM user_settings WHERE user_id = ?", (int(user_id),))
+    row = c.fetchone()
+    conn.close()
+    return ok({"user_id": int(user_id), "mask_inverted": bool(row["mask_inverted"]) if row else False})
+
+
+@app.route("/api/miniapp/settings", methods=["PATCH"])
+def miniapp_settings_patch():
+    user_id = request.args.get("user_id", "").strip()
+    if not user_id or not user_id.isdigit():
+        return err("Missing or invalid user_id", 400, "missing_param")
+    data = request.get_json(silent=True)
+    if not data:
+        return err("JSON body required", 400, "invalid_body")
+    conn = get_db()
+    c = conn.cursor()
+    if "mask_inverted" in data:
+        val = int(bool(data["mask_inverted"]))
+        c.execute(
+            "INSERT INTO user_settings (user_id, mask_inverted) VALUES (?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET mask_inverted = ?",
+            (int(user_id), val, val)
+        )
+    conn.commit()
+    c.execute("SELECT mask_inverted FROM user_settings WHERE user_id = ?", (int(user_id),))
+    row = c.fetchone()
+    conn.close()
+    return ok({"user_id": int(user_id), "mask_inverted": bool(row["mask_inverted"]) if row else False})
 
 
 @app.route("/api/health")
