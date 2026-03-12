@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 from PIL import Image, ImageOps
 from telegram import Update, InputSticker, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, MenuButtonWebApp
+from telegram.error import BadRequest
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ConversationHandler, ContextTypes, CallbackQueryHandler
@@ -88,6 +89,28 @@ def get_user_packs(user_id):
     conn.close()
     return rows
 
+def update_pack_title_in_db(user_id, name, title):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('UPDATE packs SET title = ? WHERE user_id = ? AND name = ?', (title, user_id, name))
+    conn.commit()
+    conn.close()
+
+async def validate_and_sync_packs(bot, user_id):
+    """Check each DB pack against Telegram. Prune deleted packs, sync renamed titles."""
+    packs = get_user_packs(user_id)
+    valid = []
+    for name, title in packs:
+        try:
+            ss = await bot.get_sticker_set(name)
+            if ss.title != title:
+                update_pack_title_in_db(user_id, name, ss.title)
+            valid.append((name, ss.title))
+        except Exception:
+            delete_pack_from_db(user_id, name)
+            logger.info(f"Pruned stale pack {name} for user {user_id}")
+    return valid
+
 def is_new_user(user_id):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -102,10 +125,11 @@ def is_new_user(user_id):
 WAITING_TITLE, WAITING_STICKER = range(2)
 CHOOSING_PACK, WAITING_STICKER_ADD = range(2, 4)
 WAITING_SOURCE_IMAGE, WAITING_MASK_IMAGE, WAITING_CUT_PACK = range(4, 7)
+WAITING_SYNC_NAME = 7
 
 STICKER_EMOJI = ["✨"]
 
-DIV = "✦ ─────────────── ✦"
+DIV = "◈ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ◈"
 
 def cancel_keyboard():
     return InlineKeyboardMarkup([[InlineKeyboardButton("✕ Cancel", callback_data="nav:home")]])
@@ -275,9 +299,13 @@ async def send_menu(update, menu_id):
 
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(
-            text, reply_markup=keyboard, parse_mode="HTML", disable_web_page_preview=True
-        )
+        try:
+            await update.callback_query.edit_message_text(
+                text, reply_markup=keyboard, parse_mode="HTML", disable_web_page_preview=True
+            )
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                raise
     elif update.message:
         await update.message.reply_text(
             text, reply_markup=keyboard, parse_mode="HTML", disable_web_page_preview=True
@@ -296,16 +324,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if is_new_user(user.id):
         welcome = (
-            f"🔮 <b>Welcome, {first_name}!</b>\n"
+            f"⚗️ <b>The laboratory opens, {first_name}.</b>\n"
             f"{DIV}\n\n"
-            "✨ You've just entered the <b>Stix Magic</b> workshop — "
-            "where ordinary photos become Telegram stickers!\n\n"
-            "Here's all you need to know:\n\n"
-            "1️⃣ Tap <b>🟣 CREATE PACK</b> and give your pack a name\n"
-            "2️⃣ Send any photo or video — it becomes a sticker instantly!\n"
-            "3️⃣ Add more stickers, share with friends, or use <b>⚗️ Magic Cut</b> "
-            "to remove backgrounds like a wizard 🧙\n\n"
-            "<i>Not sure where to start? Tap 🟠 HELP — START HERE below!</i>"
+            "You have entered the sticker alchemy lab.\n\n"
+            "◦ Any image → transmuted into a sticker\n"
+            "◦ Image + mask → precision cutout ritual\n"
+            "◦ Video & GIF forms accepted\n\n"
+            "<i>Begin by forging your first pack below.</i>"
         )
         keyboard = build_keyboard("home")
         await update.message.reply_text(welcome, reply_markup=keyboard, parse_mode="HTML")
@@ -317,11 +342,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def create_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        f"🟣 <b>CREATE A NEW STICKER PACK</b>\n"
+        f"⚗️ <b>FORGE A PACK</b>\n"
         f"{DIV}\n\n"
-        "Easy! Just tell me what you want to call it.\n\n"
-        "📝 Type the <b>display title</b> for your pack:\n"
-        "<i>(e.g. \"My Cool Stickers\" — up to 64 characters)</i>"
+        "Name the vessel — what shall this pack be called?\n\n"
+        "<i>Display title · up to 64 characters.</i>"
     )
     if update.callback_query:
         await update.callback_query.answer()
@@ -344,14 +368,12 @@ async def create_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data['newpack_title'] = title
     await update.message.reply_text(
-        f"✨ Great name — <b>{html.escape(title)}</b>!\n"
+        f"⚗️ <b>{html.escape(title)}</b>\n"
         f"{DIV}\n\n"
-        "Now send me the <b>first sticker image</b> for this pack.\n\n"
-        "📸 You can send:\n"
-        "◦ A regular photo or image file (PNG, JPG)\n"
-        "◦ A GIF or short video (becomes an animated sticker)\n"
-        "◦ An existing Telegram sticker\n\n"
-        "<i>Don't worry — you can always add more later!</i>",
+        "The vessel is named. Now send the <b>seed sticker</b>.\n\n"
+        "◦ Any image, photo, or GIF\n"
+        "◦ Videos transmute as animated stickers\n"
+        "◦ Or forward an existing sticker",
         parse_mode="HTML",
         reply_markup=cancel_keyboard()
     )
@@ -365,12 +387,12 @@ async def create_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_id, media_type, sticker_format = extract_file_info(update.message)
     if not file_id:
         await update.message.reply_text(
-            "⚠ Send an image, video, GIF, or sticker.",
+            "⚠ The ingredient is unrecognised — send an image, video, GIF, or sticker.",
             reply_markup=cancel_keyboard()
         )
         return WAITING_STICKER
 
-    progress = await update.message.reply_text("✦ <i>Creating your pack...</i>", parse_mode="HTML")
+    progress = await update.message.reply_text("⚗️ <i>Transmuting the vessel...</i>", parse_mode="HTML")
 
     bot_username = context.bot.username
     suffix = "".join(random.choices(string.ascii_lowercase, k=5))
@@ -387,7 +409,7 @@ async def create_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if converted:
                 sticker_file = converted
         elif media_type == "video":
-            await progress.edit_text("✦ <i>Converting video...</i>", parse_mode="HTML")
+            await progress.edit_text("⚗️ <i>Distilling the animation...</i>", parse_mode="HTML")
             converted = convert_video_to_sticker(sticker_file)
             if converted:
                 sticker_file = converted
@@ -404,40 +426,38 @@ async def create_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         add_pack_to_db(user.id, pack_name, title)
 
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Add More Stickers", callback_data=f"addto_{pack_name}")],
-            [InlineKeyboardButton("🔗 Open Pack", url=f"https://t.me/addstickers/{pack_name}")],
+            [InlineKeyboardButton("✦ Inscribe More Stickers", callback_data=f"addto_{pack_name}")],
+            [InlineKeyboardButton("🔗 Open the Vessel", url=f"https://t.me/addstickers/{pack_name}")],
             [
-                InlineKeyboardButton("▦ My Packs", callback_data="menu_packs"),
+                InlineKeyboardButton("📖 Grimoire", callback_data="menu_packs"),
                 InlineKeyboardButton("✦ Home", callback_data="nav:home"),
             ],
         ])
 
         await progress.edit_text(
-            f"🎉 <b>Pack created!</b>\n"
+            f"⚗️ <b>Pack forged!</b>\n"
             f"{DIV}\n\n"
-            f"<b>{html.escape(title)}</b> is now live on Telegram! 🚀\n\n"
-            "<i>Tap ➕ Add More Stickers to keep building,\n"
-            "or 🔗 Open Pack to see it right now.</i>",
+            f"<b>{html.escape(title)}</b>\n"
+            f"<i>The first sticker is sealed within.</i>",
             parse_mode="HTML",
             reply_markup=keyboard
         )
     except Exception as e:
         logger.error(f"Error creating sticker set: {e}")
         err = str(e)
-        friendly = "The file might be too large or an unsupported format. Try a PNG or JPG image."
+        friendly = "The ingredients were not accepted. Try a PNG or JPG image."
         if "too big" in err.lower():
-            friendly = "File is too large. Try a smaller image (under 512px)."
+            friendly = "The ingredient is too large — try a smaller image (under 512px)."
         elif "invalid" in err.lower():
-            friendly = "The file format wasn't accepted. Try a PNG or JPG."
+            friendly = "The form was rejected by Telegram. Try a PNG or JPG."
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 Try Again", callback_data="menu_create")],
             [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
         ])
         await progress.edit_text(
-            f"⚠️ <b>Something went wrong</b>\n"
+            f"⚠ <b>The transmutation failed</b>\n"
             f"{DIV}\n\n"
-            f"{friendly}\n\n"
-            "<i>Tip: use a PNG or JPG image, ideally 512 × 512 px.</i>",
+            f"{friendly}",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -450,21 +470,22 @@ async def create_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def addsticker_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    packs = get_user_packs(user.id)
 
     if update.callback_query:
         await update.callback_query.answer()
 
+    packs = await validate_and_sync_packs(context.bot, user.id)
+
     if not packs:
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬡ Create a Pack", callback_data="menu_create")],
+            [InlineKeyboardButton("⚗️ Forge a Pack", callback_data="menu_create")],
             [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
         ])
         msg = (
-            f"➕ <b>ADD STICKER</b>\n"
+            f"✦ <b>INSCRIBE A STICKER</b>\n"
             f"{DIV}\n\n"
-            "You don't have any packs yet!\n\n"
-            "<i>Create your first pack — it only takes a few seconds. 🔮</i>"
+            "The grimoire is empty — no vessels exist yet.\n"
+            "Forge a pack first!"
         )
         if update.callback_query:
             await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=keyboard)
@@ -477,9 +498,9 @@ async def addsticker_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['user_packs'] = packs
 
     msg = (
-        f"➕ <b>ADD STICKER</b>\n"
+        f"✦ <b>INSCRIBE A STICKER</b>\n"
         f"{DIV}\n\n"
-        "👇 Which pack do you want to add to?"
+        "Which vessel receives the sticker?"
     )
     if update.callback_query:
         await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard_rows))
@@ -496,10 +517,10 @@ async def addto_direct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['user_packs'] = packs
     context.user_data['selected_pack'] = pack_name
     await query.edit_message_text(
-        f"➕ <b>ADD STICKER</b>\n"
+        f"✦ <b>INSCRIBE A STICKER</b>\n"
         f"{DIV}\n\n"
-        "Send me the sticker image to add.\n\n"
-        "📸 Photo, image file, GIF, video, or an existing sticker",
+        "Send the ingredient to bind into this vessel.\n\n"
+        "◦ Image, video, GIF, or existing sticker",
         parse_mode="HTML",
         reply_markup=cancel_keyboard()
     )
@@ -522,10 +543,10 @@ async def addsticker_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pack_title = next((t for n, t in packs if n == pack_name), pack_name)
 
     await query.edit_message_text(
-        f"➕ <b>{html.escape(pack_title)}</b>\n"
+        f"✦ <b>{html.escape(pack_title)}</b>\n"
         f"{DIV}\n\n"
-        "Send me the image to add as a sticker.\n\n"
-        "📸 Photo, image file, GIF, video, or an existing sticker",
+        "Send the ingredient to seal into this vessel.\n\n"
+        "◦ Image, video, GIF, or existing sticker",
         parse_mode="HTML",
         reply_markup=cancel_keyboard()
     )
@@ -541,12 +562,12 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
     file_id, media_type, sticker_format = extract_file_info(update.message)
     if not file_id:
         await update.message.reply_text(
-            "⚠ Send an image, video, GIF, or sticker.",
+            "⚠ The ingredient is unrecognised — send an image, video, GIF, or sticker.",
             reply_markup=cancel_keyboard()
         )
         return WAITING_STICKER_ADD
 
-    progress = await update.message.reply_text("✦ <i>Adding sticker...</i>", parse_mode="HTML")
+    progress = await update.message.reply_text("⚗️ <i>Binding the sticker...</i>", parse_mode="HTML")
 
     try:
         sticker_file = await download_file_bytes(context.bot, file_id)
@@ -559,7 +580,7 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if converted:
                 sticker_file = converted
         elif media_type == "video":
-            await progress.edit_text("✦ <i>Converting video...</i>", parse_mode="HTML")
+            await progress.edit_text("⚗️ <i>Distilling the animation...</i>", parse_mode="HTML")
             converted = convert_video_to_sticker(sticker_file)
             if converted:
                 sticker_file = converted
@@ -572,19 +593,18 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Add Another", callback_data=f"addto_{pack_name}")],
-            [InlineKeyboardButton("🔗 Open Pack", url=f"https://t.me/addstickers/{pack_name}")],
+            [InlineKeyboardButton("✦ Bind Another", callback_data=f"addto_{pack_name}")],
+            [InlineKeyboardButton("🔗 Open the Vessel", url=f"https://t.me/addstickers/{pack_name}")],
             [
-                InlineKeyboardButton("▦ My Packs", callback_data="menu_packs"),
+                InlineKeyboardButton("📖 Grimoire", callback_data="menu_packs"),
                 InlineKeyboardButton("✦ Home", callback_data="nav:home"),
             ],
         ])
 
         await progress.edit_text(
-            f"✨ <b>Sticker added!</b>\n"
+            f"✦ <b>Sticker sealed</b>\n"
             f"{DIV}\n\n"
-            f"<b>{html.escape(pack_title)}</b> is growing! 🎉\n\n"
-            "<i>Keep adding more or open the pack to share it.</i>",
+            f"<b>{html.escape(pack_title)}</b> grows stronger.",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -595,7 +615,7 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
             [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
         ])
         await progress.edit_text(
-            f"⚠ <b>Couldn't add sticker</b>\n"
+            f"⚠ <b>The binding failed</b>\n"
             f"{DIV}\n\n"
             f"<i>{html.escape(str(e))}</i>",
             parse_mode="HTML",
@@ -611,15 +631,14 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def magic_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     inverted = get_mask_inverted(user.id)
-    mode = "⬛ black = keep  ·  ⬜ white = remove" if inverted else "⬜ white = keep  ·  ⬛ black = remove"
+    mode = "⬛ black = keep  ·  ⬜ white = dissolve" if inverted else "⬜ white = keep  ·  ⬛ black = dissolve"
 
     text = (
-        f"⚗️ <b>MAGIC CUT — Step 1 of 2</b>\n"
+        f"◈ <b>THE CUTTING RITUAL</b>\n"
         f"{DIV}\n\n"
-        "This spell removes the background from your photo!\n\n"
-        "📸 First, send me the <b>photo you want to cut</b>.\n\n"
-        f"<i>Mask mode: {mode}</i>\n"
-        f"<i>(Change this in ⚙️ Settings → Mask Mode)</i>"
+        f"<b>Step 1 of 2</b> — Cast the <b>source image</b> into the circle.\n\n"
+        f"<i>Oracle mode: {mode}</i>\n"
+        f"<i>Reconfigure in ⚙ Oracle settings</i>"
     )
     if update.callback_query:
         await update.callback_query.answer()
@@ -633,28 +652,26 @@ async def magic_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_id, _, _ = extract_file_info(update.message)
     if not file_id:
         await update.message.reply_text(
-            "⚠ Send a photo or image file.",
+            "⚠ The form is unrecognised — send a photo or image file.",
             reply_markup=cancel_keyboard()
         )
         return WAITING_SOURCE_IMAGE
 
     source_bytes = await download_file_bytes(context.bot, file_id)
     if not source_bytes:
-        await update.message.reply_text("⚠ Download failed. Try again.", reply_markup=cancel_keyboard())
+        await update.message.reply_text("⚠ The ingredient could not be summoned. Try again.", reply_markup=cancel_keyboard())
         return WAITING_SOURCE_IMAGE
 
     context.user_data['cut_source'] = source_bytes.getvalue()
 
     inverted = get_mask_inverted(update.effective_user.id)
-    mode = "⬛ black = <b>KEEP</b>  ·  ⬜ white = remove" if inverted else "⬜ white = <b>KEEP</b>  ·  ⬛ black = remove"
+    mode = "⬛ black = <b>KEEP</b>  ·  ⬜ white = dissolve" if inverted else "⬜ white = <b>KEEP</b>  ·  ⬛ black = dissolve"
 
     await update.message.reply_text(
-        f"⚗️ <b>MAGIC CUT — Step 2 of 2</b>\n"
+        f"◈ <b>THE CUTTING RITUAL</b>\n"
         f"{DIV}\n\n"
-        "Now send me the <b>black‑and‑white mask</b>.\n\n"
-        f"{mode}\n\n"
-        "<i>The white/black areas in your mask tell the bot\n"
-        "which parts of the photo to keep or remove.</i>",
+        f"<b>Step 2 of 2</b> — Now present the <b>B&W mask</b>.\n\n"
+        f"{mode}",
         parse_mode="HTML",
         reply_markup=cancel_keyboard()
     )
@@ -665,7 +682,7 @@ async def magic_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_id, _, _ = extract_file_info(update.message)
     if not file_id:
         await update.message.reply_text(
-            "⚠ Send a black‑and‑white mask image.",
+            "⚠ The mask form is unrecognised — send a black & white image.",
             reply_markup=cancel_keyboard()
         )
         return WAITING_MASK_IMAGE
@@ -684,7 +701,7 @@ async def magic_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return ConversationHandler.END
 
-    progress = await update.message.reply_text("✦ <i>The wizard is cutting...</i>", parse_mode="HTML")
+    progress = await update.message.reply_text("◈ <i>The ritual is at work...</i>", parse_mode="HTML")
 
     try:
         source_io = io.BytesIO(source_data)
@@ -696,7 +713,7 @@ async def magic_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await progress.delete()
         await update.message.reply_photo(
             photo=io.BytesIO(context.user_data['cut_result']),
-            caption=f"✨ <b>Preview</b> — how does it look?",
+            caption=f"◈ <b>The cut is revealed.</b>",
             parse_mode="HTML"
         )
 
@@ -704,28 +721,28 @@ async def magic_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard_rows = []
         if packs:
             for name, title in packs:
-                keyboard_rows.append([InlineKeyboardButton(f"➕ Add to  {title}", callback_data=f"cutpack_{name}")])
-        keyboard_rows.append([InlineKeyboardButton("💾 Download File", callback_data="cut_download")])
+                keyboard_rows.append([InlineKeyboardButton(f"✦ Seal into  {title}", callback_data=f"cutpack_{name}")])
+        keyboard_rows.append([InlineKeyboardButton("🜁 Extract the Essence", callback_data="cut_download")])
         keyboard_rows.append([
-            InlineKeyboardButton("🔄 Start Over", callback_data="menu_magic"),
+            InlineKeyboardButton("◈ New Ritual", callback_data="menu_magic"),
             InlineKeyboardButton("✦ Home", callback_data="nav:home"),
         ])
 
         await update.message.reply_text(
-            "✨ What would you like to do with your cut‑out?",
+            "What fate for this essence?",
             reply_markup=InlineKeyboardMarkup(keyboard_rows)
         )
     except Exception as e:
         logger.error(f"Error applying mask: {e}")
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔄 Try Again", callback_data="menu_magic")],
+            [InlineKeyboardButton("🔄 Retry Ritual", callback_data="menu_magic")],
             [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
         ])
         await progress.edit_text(
-            f"⚠️ <b>Magic Cut failed</b>\n"
+            f"⚠ <b>The ritual faltered</b>\n"
             f"{DIV}\n\n"
-            "Please make sure both images are valid.\n"
-            "<i>The mask must be a plain black‑and‑white image (no colors).</i>",
+            "Inspect your ingredients.\n"
+            "<i>The mask must be a black & white image.</i>",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -753,11 +770,11 @@ async def magic_pack_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_document(
             chat_id=query.message.chat_id,
             document=io.BytesIO(cut_result),
-            filename="stixmagic_sticker.webp",
-            caption="✦ Your sticker — ready to use"
+            filename="stixmagic_essence.webp",
+            caption="🜁 The essence is extracted — yours to keep."
         )
         await query.edit_message_text(
-            "💾 <b>Downloaded</b>",
+            "🜁 <b>Essence extracted</b>",
             parse_mode="HTML",
             reply_markup=home_keyboard()
         )
@@ -779,19 +796,19 @@ async def magic_pack_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 sticker=input_sticker
             )
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔗 Open Pack", url=f"https://t.me/addstickers/{pack_name}")],
-                [InlineKeyboardButton("◈ New Cut", callback_data="menu_magic"),
+                [InlineKeyboardButton("🔗 Open the Vessel", url=f"https://t.me/addstickers/{pack_name}")],
+                [InlineKeyboardButton("◈ New Ritual", callback_data="menu_magic"),
                  InlineKeyboardButton("✦ Home", callback_data="nav:home")],
             ])
             await query.edit_message_text(
-                f"✦ <b>Added to {html.escape(pack_title)}</b>",
+                f"✦ <b>Bound to {html.escape(pack_title)}</b>",
                 parse_mode="HTML",
                 reply_markup=keyboard
             )
         except Exception as e:
             logger.error(f"Error adding cut sticker: {e}")
             await query.edit_message_text(
-                f"⚠ <b>Couldn't add sticker</b>\n\n<i>{html.escape(str(e))}</i>",
+                f"⚠ <b>The binding failed</b>\n\n<i>{html.escape(str(e))}</i>",
                 parse_mode="HTML",
                 reply_markup=home_keyboard()
             )
@@ -805,7 +822,7 @@ async def magic_pack_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
-        "✦ Cancelled.",
+        "✦ The ritual is dissolved.",
         reply_markup=home_keyboard()
     )
     return ConversationHandler.END
@@ -813,29 +830,24 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        f"📖 <b>HOW IT WORKS</b>\n"
+        f"📖 <b>THE CRAFT</b>\n"
         f"{DIV}\n\n"
-        "<b>🟣 CREATE A STICKER PACK</b>\n"
-        "  1. Tap Create Pack and type a title\n"
-        "  2. Send any photo or video\n"
-        "  3. Your pack is live on Telegram! 🎉\n\n"
-        "<b>➕ ADD MORE STICKERS</b>\n"
-        "  Tap Add Sticker, pick your pack,\n"
-        "  then send the image to add.\n\n"
-        "<b>⚗️ MAGIC CUT</b>\n"
-        "  1. Send your <b>subject photo</b>\n"
-        "  2. Send a <b>black‑and‑white mask</b>\n"
-        "     (white = keep, black = remove)\n"
-        "  3. Get a clean transparent cut‑out!\n\n"
-        "<b>⚙️ SETTINGS</b>\n"
-        "  Flip mask colors if your cut‑outs\n"
-        "  look inverted.\n"
+        "<b>⚗️ FORGE A PACK</b>\n"
+        "  Name the vessel → seal a sticker inside\n"
+        "  → pack is live on Telegram\n\n"
+        "<b>✦ INSCRIBE A STICKER</b>\n"
+        "  Choose a vessel → bind more stickers within\n\n"
+        "<b>◈ THE CUTTING RITUAL</b>\n"
+        "  Cast a photo + black & white mask\n"
+        "  → receive a clean transparent cutout\n\n"
+        "<b>⚙ ORACLE SETTINGS</b>\n"
+        "  Reconfigure the mask oracle (white/black = keep)\n"
     )
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💡 Quick Tips", callback_data="nav:tips")],
+        [InlineKeyboardButton("◦ Alchemist's Field Notes", callback_data="nav:tips")],
         [InlineKeyboardButton("◂ Back", callback_data="nav:help"),
-         InlineKeyboardButton("🔮 Home", callback_data="nav:home")],
+         InlineKeyboardButton("✦ Home", callback_data="nav:home")],
     ])
 
     if update.callback_query:
@@ -847,18 +859,18 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        f"🔮 <b>STIX MAGIC</b>\n"
+        f"✦ <b>STIX MAGIC</b>\n"
         f"{DIV}\n\n"
-        "✨ Your personal sticker alchemy workshop.\n\n"
-        "Transform any photo, video, or GIF into a\n"
-        "Telegram sticker in seconds — no apps, no\n"
-        "editing skills needed. Pure magic. 🧙\n\n"
+        "An alchemist's workshop for Telegram stickers.\n\n"
+        "Every image holds a sticker in waiting.\n"
+        "We transmute it. We cut. We seal.\n\n"
+        "Forge packs. Bind stickers. Perform the ritual.\n\n"
         "<i>stixmagic.com</i>"
     )
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🌐 stixmagic.com", url="https://stixmagic.com")],
-        [InlineKeyboardButton("🔮 Home", callback_data="nav:home")],
+        [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
     ])
 
     if update.callback_query:
@@ -870,35 +882,36 @@ async def show_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def manage_stickers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    packs = get_user_packs(user.id)
 
     if update.callback_query:
         await update.callback_query.answer()
 
+    packs = await validate_and_sync_packs(context.bot, user.id)
+
     if not packs:
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬡ Create a Pack", callback_data="menu_create")],
+            [InlineKeyboardButton("⚗️ Forge a Pack", callback_data="menu_create")],
             [InlineKeyboardButton("◂ Back", callback_data="nav:my_packs"),
              InlineKeyboardButton("✦ Home", callback_data="nav:home")],
         ])
-        msg = f"⚡ <b>MANAGE</b>\n{DIV}\n\nNo packs yet."
+        msg = f"⚗️ <b>THE CRUCIBLE</b>\n{DIV}\n\nThe crucible is empty — no vessels to manage."
         if update.callback_query:
             await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=keyboard)
         else:
             await update.message.reply_text(msg, parse_mode="HTML", reply_markup=keyboard)
         return
 
-    msg = f"⚡ <b>MANAGE</b>\n{DIV}\n\n"
+    msg = f"⚗️ <b>THE CRUCIBLE</b>\n{DIV}\n\n"
     for idx, (name, title) in enumerate(packs, 1):
         msg += f"{idx}.  <b>{title}</b>\n"
 
     keyboard_rows = []
     for name, title in packs:
         keyboard_rows.append([
-            InlineKeyboardButton(f"➕ {title}", callback_data=f"addto_{name}"),
-            InlineKeyboardButton("🗑", callback_data=f"del_{name}"),
+            InlineKeyboardButton(f"✦ {title}", callback_data=f"addto_{name}"),
+            InlineKeyboardButton("🜄", callback_data=f"del_{name}"),
         ])
-    keyboard_rows.append([InlineKeyboardButton("⬡ New Pack", callback_data="menu_create")])
+    keyboard_rows.append([InlineKeyboardButton("⚗️ Forge New Pack", callback_data="menu_create")])
     keyboard_rows.append([
         InlineKeyboardButton("◂ Back", callback_data="nav:my_packs"),
         InlineKeyboardButton("✦ Home", callback_data="nav:home"),
@@ -925,8 +938,8 @@ async def delete_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         ]
     ])
     await query.edit_message_text(
-        f"⚠ Remove <b>{pack_title}</b> from your list?\n\n"
-        "<i>This only removes it from Stix Magic — the Telegram pack stays live.</i>",
+        f"⚠ Dissolve <b>{pack_title}</b> from your grimoire?\n\n"
+        "<i>This only removes it from Stix Magic — the Telegram vessel stays live.</i>",
         parse_mode="HTML",
         reply_markup=keyboard
     )
@@ -943,7 +956,7 @@ async def delete_pack_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE
     delete_pack_from_db(user.id, pack_name)
 
     await query.edit_message_text(
-        f"✦ <b>{pack_title}</b> removed from your list.",
+        f"🜄 <b>{pack_title}</b> dissolved from your grimoire.",
         parse_mode="HTML",
         reply_markup=home_keyboard()
     )
@@ -951,25 +964,26 @@ async def delete_pack_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def show_packs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    packs = get_user_packs(user.id)
 
     if update.callback_query:
         await update.callback_query.answer()
 
+    packs = await validate_and_sync_packs(context.bot, user.id)
+
     if not packs:
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬡ Create a Pack", callback_data="menu_create")],
+            [InlineKeyboardButton("⚗️ Forge a Pack", callback_data="menu_create")],
             [InlineKeyboardButton("◂ Back", callback_data="nav:my_packs"),
              InlineKeyboardButton("✦ Home", callback_data="nav:home")],
         ])
-        msg = f"▦ <b>YOUR PACKS</b>\n{DIV}\n\nNothing here yet.\nCreate your first pack!"
+        msg = f"📖 <b>YOUR GRIMOIRE</b>\n{DIV}\n\nThe grimoire is empty.\nForge your first vessel!"
         if update.callback_query:
             await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=keyboard)
         else:
             await update.message.reply_text(msg, parse_mode="HTML", reply_markup=keyboard)
         return
 
-    msg = f"▦ <b>YOUR PACKS</b>\n{DIV}\n\n"
+    msg = f"📖 <b>YOUR GRIMOIRE</b>\n{DIV}\n\n"
     for idx, (name, title) in enumerate(packs, 1):
         msg += f"<b>{idx}. {title}</b>\n"
 
@@ -977,8 +991,8 @@ async def show_packs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for name, title in packs:
         keyboard_rows.append([InlineKeyboardButton(f"🔗 {title}", url=f"https://t.me/addstickers/{name}")])
     keyboard_rows.append([
-        InlineKeyboardButton("⬡ New Pack", callback_data="menu_create"),
-        InlineKeyboardButton("➕ Add Sticker", callback_data="menu_addsticker"),
+        InlineKeyboardButton("⚗️ Forge Pack", callback_data="menu_create"),
+        InlineKeyboardButton("✦ Inscribe Sticker", callback_data="menu_addsticker"),
     ])
     keyboard_rows.append([
         InlineKeyboardButton("◂ Back", callback_data="nav:my_packs"),
@@ -995,18 +1009,15 @@ async def settings_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user = query.from_user
     inverted = get_mask_inverted(user.id)
-    current = "⬛ Black = keep" if inverted else "⬜ White = keep"
+    current = "⬛ Black = keep · ⬜ White = dissolve" if inverted else "⬜ White = keep · ⬛ Black = dissolve"
     toggle_label = "Switch to ⬜ White = keep" if inverted else "Switch to ⬛ Black = keep"
 
     text = (
-        f"⚙️ <b>MASK MODE</b>\n"
+        f"◐ <b>THE ORACLE</b>\n"
         f"{DIV}\n\n"
-        f"Current setting: <b>{current}</b>\n\n"
-        "This controls which color in your mask image\n"
-        "gets <b>kept</b> when using ⚗️ Magic Cut.\n\n"
-        "◦ <b>White = keep</b> — paint white over the subject\n"
-        "◦ <b>Black = keep</b> — paint black over the subject\n\n"
-        "<i>If your cut‑outs look inside‑out, tap the button below to flip it.</i>"
+        f"Current mode: <b>{current}</b>\n\n"
+        "<i>The oracle decides which color in your mask\n"
+        "is preserved and which is dissolved.</i>"
     )
 
     keyboard = InlineKeyboardMarkup([
@@ -1022,8 +1033,78 @@ async def toggle_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = query.from_user
     current = get_mask_inverted(user.id)
     set_mask_inverted(user.id, not current)
-    await query.answer("Switched!")
+    await query.answer("Oracle reconfigured ✦")
     await settings_mask(update, context)
+
+
+# ── SYNC / IMPORT PACK ───────────────────────────────────────
+
+async def sync_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Entry point for /sync command."""
+    if context.args:
+        return await _sync_process(update, context, " ".join(context.args))
+    await update.message.reply_text(
+        f"🔄 <b>SUMMON A PACK</b>\n{DIV}\n\n"
+        "Speak the pack name or link to summon it into your grimoire:\n\n"
+        "<code>my_pack_name</code>\n"
+        "or\n"
+        "<code>https://t.me/addstickers/my_pack_name</code>",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✕ Cancel", callback_data="nav:home")]
+        ])
+    )
+    return WAITING_SYNC_NAME
+
+
+async def sync_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await _sync_process(update, context, update.message.text.strip())
+
+
+async def _sync_process(update: Update, context: ContextTypes.DEFAULT_TYPE, pack_input: str):
+    """Validate the pack name/link and add to DB if found."""
+    pack_name = pack_input.strip().rstrip("/")
+    if "t.me/addstickers/" in pack_name:
+        pack_name = pack_name.split("t.me/addstickers/")[-1].strip().rstrip("/")
+
+    user = update.effective_user
+    status_msg = await update.message.reply_text("🔄 <i>Consulting the archives...</i>", parse_mode="HTML")
+
+    try:
+        ss = await context.bot.get_sticker_set(pack_name)
+    except Exception:
+        await status_msg.edit_text(
+            f"⚠ <b>Pack not found in the archives</b>\n{DIV}\n\n"
+            f"No vessel named <code>{html.escape(pack_name)}</code> exists on Telegram.\n\n"
+            "Try speaking the name again, or /cancel to abandon.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✕ Cancel", callback_data="nav:home")]
+            ])
+        )
+        return WAITING_SYNC_NAME
+
+    existing = get_user_packs(user.id)
+    if any(n == pack_name for n, _ in existing):
+        await status_msg.edit_text(
+            f"✦ <b>{html.escape(ss.title)}</b> is already bound to your grimoire.",
+            parse_mode="HTML",
+            reply_markup=home_keyboard()
+        )
+        return ConversationHandler.END
+
+    add_pack_to_db(user.id, pack_name, ss.title)
+    await status_msg.edit_text(
+        f"⚗️ <b>Pack summoned!</b>\n{DIV}\n\n"
+        f"<b>{html.escape(ss.title)}</b> has been bound to your grimoire.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔗 Open the Vessel", url=f"https://t.me/addstickers/{pack_name}")],
+            [InlineKeyboardButton("⚗️ The Crucible", callback_data="menu_manage")],
+            [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+        ])
+    )
+    return ConversationHandler.END
 
 
 # ── CALLBACK ROUTER ──────────────────────────────────────────
@@ -1119,6 +1200,18 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)]
     )
     application.add_handler(magic_conv)
+
+    sync_conv = ConversationHandler(
+        entry_points=[
+            CommandHandler("sync", sync_start),
+            CallbackQueryHandler(sync_start, pattern="^menu_sync$"),
+        ],
+        states={
+            WAITING_SYNC_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, sync_receive)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)]
+    )
+    application.add_handler(sync_conv)
 
     application.add_handler(CallbackQueryHandler(nav_callback, pattern="^nav:"))
     application.add_handler(CallbackQueryHandler(menu_callback))

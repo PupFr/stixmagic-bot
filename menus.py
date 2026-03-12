@@ -1,7 +1,7 @@
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
-DIV = "✦ ─────────────── ✦"
+DIVIDER = "◈ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ◈"
 
 def _resolve_miniapp_url():
     url = os.environ.get("MINIAPP_URL", "")
@@ -16,100 +16,92 @@ MINIAPP_URL = _resolve_miniapp_url()
 MENU_STRUCTURE = {
 
     "home": {
-        "header": "🔮 <b>STIX MAGIC</b>",
+        "header": "⚗️ <b>STIX MAGIC</b>",
         "body": (
-            "<i>✨ Your sticker alchemy workshop ✨</i>\n\n"
-            "Turn <b>any photo or video</b> into a Telegram sticker in seconds.\n\n"
-            "🟣 <b>Create</b> — start a brand-new sticker pack\n"
-            "⚗️ <b>Magic Cut</b> — cut a subject out of any photo\n"
-            "🔵 <b>My Packs</b> — see all your packs\n"
-            "🟠 <b>Help</b> — new here? start here!\n"
+            "<i>the sticker alchemy laboratory</i>\n\n"
+            "Every image is raw material.\n"
+            "We transmute it into sticker gold.\n\n"
+            "⚗️ <b>forge</b>  ·  ◈ <b>ritual</b>  ·  📖 <b>grimoire</b>\n"
         ),
         "buttons": [
             [
-                {"label": "🟣 CREATE PACK", "action": "menu_create"},
-                {"label": "⚗️ MAGIC CUT", "action": "menu_magic"},
+                {"label": "⚗️ FORGE PACK", "action": "menu_create"},
+                {"label": "◈ RITUAL CUT", "action": "menu_magic"},
             ],
             [
-                {"label": "🔵 MY PACKS", "nav": "my_packs"},
-                {"label": "🔵 SETTINGS", "nav": "settings"},
+                {"label": "📖 GRIMOIRE ▸", "nav": "my_packs"},
+                {"label": "⚙ ORACLE ▸", "nav": "settings"},
             ],
             [
-                {"label": "🟠 HELP — START HERE", "nav": "help"},
-                {"label": "🟠 ABOUT", "action": "menu_about"},
+                {"label": "📜 CODEX", "nav": "help"},
+                {"label": "✦ LORE", "action": "menu_about"},
             ],
             [
-                {"label": "✨ OPEN MINI APP", "web_app": True},
+                {"label": "🔮 OPEN THE PORTAL", "web_app": True},
             ],
         ],
         "parent": None,
     },
 
     "my_packs": {
-        "header": "🔵 <b>MY PACKS</b>",
+        "header": "📖 <b>THE GRIMOIRE</b>",
         "body": (
-            "<i>Your personal sticker collection 📦</i>\n\n"
-            "Here you can <b>view</b>, <b>add stickers to</b>, or\n"
-            "<b>manage</b> all your packs.\n\n"
-            "🔗 Tap any pack link to open it in Telegram.\n"
+            "<i>your bound sticker vessels</i>\n\n"
+            "Inspect, inscribe, or manage\n"
+            "your sticker collections.\n"
         ),
         "buttons": [
             [
-                {"label": "👁 VIEW ALL PACKS", "action": "menu_packs"},
-                {"label": "➕ ADD STICKER", "action": "menu_addsticker"},
+                {"label": "👁 INSPECT", "action": "menu_packs"},
+                {"label": "✦ INSCRIBE", "action": "menu_addsticker"},
             ],
-            [{"label": "⚡ MANAGE PACKS", "action": "menu_manage"}],
+            [
+                {"label": "⚗️ CRUCIBLE", "action": "menu_manage"},
+                {"label": "🔄 SUMMON PACK", "action": "menu_sync"},
+            ],
         ],
         "parent": "home",
     },
 
     "settings": {
-        "header": "🔵 <b>SETTINGS</b>",
+        "header": "⚙ <b>THE ORACLE</b>",
         "body": (
-            "<i>Tune the magic to your liking ⚙️</i>\n\n"
-            "<b>Mask Mode</b> controls how Magic Cut works:\n\n"
-            "◦ <b>Default:</b> white areas in your mask = <b>keep</b>\n"
-            "◦ <b>Inverted:</b> black areas = <b>keep</b>\n\n"
-            "<i>Flip this if your cutouts look wrong.</i>\n"
+            "<i>configure the ritual parameters</i>\n\n"
+            "Adjust how masks and cuts\n"
+            "behave during the cutting ritual.\n"
         ),
         "buttons": [
-            [{"label": "◐ MASK MODE", "action": "settings_mask"}],
+            [{"label": "◐ ORACLE MODE", "action": "settings_mask"}],
         ],
         "parent": "home",
     },
 
     "help": {
-        "header": "🟠 <b>HELP — HOW IT WORKS</b>",
+        "header": "📜 <b>THE CODEX</b>",
         "body": (
-            "<i>New here? You're in the right place! 👋</i>\n\n"
-            "Stix Magic is super simple:\n\n"
-            "1️⃣ <b>Create a Pack</b> — give it a name, send one photo.\n"
-            "   Your sticker pack is live on Telegram! 🎉\n\n"
-            "2️⃣ <b>Add More Stickers</b> — pick your pack, send more images.\n\n"
-            "3️⃣ <b>Magic Cut</b> — send a photo + a black‑and‑white mask\n"
-            "   → get a clean cut‑out with no background.\n\n"
-            "That's it! Tap below for detailed steps or quick tips.\n"
+            "<i>ancient knowledge of the craft</i>\n\n"
+            "All rituals, all secrets —\n"
+            "the complete alchemist's manual.\n"
         ),
         "buttons": [
             [
-                {"label": "📖 DETAILED STEPS", "action": "menu_help_detail"},
-                {"label": "💡 QUICK TIPS", "nav": "tips"},
+                {"label": "📖 THE CRAFT", "action": "menu_help_detail"},
+                {"label": "◦ FIELD NOTES", "nav": "tips"},
             ],
         ],
         "parent": "home",
     },
 
     "tips": {
-        "header": "💡 <b>QUICK TIPS</b>",
+        "header": "◦ <b>ALCHEMIST'S FIELD NOTES</b>",
         "body": (
-            "<i>Get the best results every time ✨</i>\n\n"
-            "◦ <b>PNG images</b> with a transparent background work best\n"
-            "◦ Ideal image size: <b>512 × 512 px</b>\n"
-            "◦ For Magic Cut — use a <b>plain black‑and‑white image</b> as your mask\n"
-            "   (white = keep, black = remove — flip in Settings)\n"
-            "◦ <b>Videos & GIFs</b> become animated video stickers automatically\n"
-            "◦ Every sticker gets a ✨ emoji assigned automatically\n"
-            "◦ Can't see your pack? Tap the 🔗 link to add it in Telegram\n"
+            "<i>hard-won knowledge from the lab</i>\n\n"
+            "◦ Use <b>PNG</b> with transparency for finest results\n"
+            "◦ Ideal vessel size: <b>512 × 512</b> px\n"
+            "◦ Mask: white = keep · black = dissolve\n"
+            "   <i>(flip this in ⚙ Oracle settings)</i>\n"
+            "◦ Videos & GIFs transmute as animated stickers\n"
+            "◦ Emoji sigil is auto-assigned  ✨\n"
         ),
         "buttons": [],
         "parent": "help",
@@ -156,7 +148,7 @@ def get_menu_text(menu_id):
     if not menu:
         return "Menu not found."
 
-    text = f"{menu['header']}\n{DIV}\n\n"
+    text = f"{menu['header']}\n{DIVIDER}\n\n"
     if menu.get("body"):
         text += menu["body"]
 

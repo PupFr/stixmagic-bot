@@ -1,6 +1,8 @@
 import os
+import re
 import sqlite3
 import time
+import asyncio
 from functools import wraps
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -99,14 +101,69 @@ def miniapp():
 
 # ── MINI APP (no API key — user_id comes from Telegram initData) ──
 
+def _run_async(coro):
+    """Run an async coroutine safely from a synchronous Flask route."""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+async def _validate_packs_async(token, user_id):
+    """Validate all DB packs against Telegram; prune deleted, sync renamed titles."""
+    from telegram import Bot as TelegramBot
+    bot = TelegramBot(token=token)
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT name, title FROM packs WHERE user_id = ? ORDER BY id", (user_id,))
+        rows = c.fetchall()
+        conn.close()
+        valid = []
+        for row in rows:
+            name, title = row["name"], row["title"]
+            try:
+                ss = await bot.get_sticker_set(name)
+                if ss.title != title:
+                    upd = get_db()
+                    upd.execute(
+                        "UPDATE packs SET title = ? WHERE user_id = ? AND name = ?",
+                        (ss.title, user_id, name)
+                    )
+                    upd.commit()
+                    upd.close()
+                    title = ss.title
+                valid.append({"name": name, "title": title, "link": f"https://t.me/addstickers/{name}"})
+            except Exception:
+                rm = get_db()
+                rm.execute("DELETE FROM packs WHERE user_id = ? AND name = ?", (user_id, name))
+                rm.commit()
+                rm.close()
+        return valid
+    finally:
+        await bot.close()
+
+
 @app.route("/api/miniapp/packs")
 def miniapp_packs():
     user_id = request.args.get("user_id", "").strip()
     if not user_id or not user_id.isdigit():
         return err("Missing or invalid user_id", 400, "missing_param")
+    uid = int(user_id)
+
+    raw_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    token_match = re.search(r'\d+:[A-Za-z0-9_-]{35,}', raw_token)
+    if token_match:
+        try:
+            packs = _run_async(_validate_packs_async(token_match.group(0), uid))
+            return ok(packs)
+        except Exception:
+            pass
+
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT name, title FROM packs WHERE user_id = ? ORDER BY id", (int(user_id),))
+    c.execute("SELECT name, title FROM packs WHERE user_id = ? ORDER BY id", (uid,))
     rows = c.fetchall()
     conn.close()
     return ok([
