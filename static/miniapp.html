@@ -1,887 +1,495 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Stix Magic</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Stix Magic</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --surface: #18181f;
+      --surface2: #22222d;
+      --border: rgba(255,255,255,0.07);
+      --accent: #9b6dff;
+      --accent2: #6c9fff;
+      --text: #f0f0f5;
+      --muted: #8888a0;
+      --danger: #ff5f72;
+      --radius: 14px;
+      --gap: 12px;
+    }
 
-        :root {
-            --bg: var(--tg-theme-bg-color, #17212b);
-            --bg-secondary: var(--tg-theme-secondary-bg-color, #232e3c);
-            --text: var(--tg-theme-text-color, #f5f5f5);
-            --hint: var(--tg-theme-hint-color, #708499);
-            --link: var(--tg-theme-link-color, #5288c1);
-            --button: var(--tg-theme-button-color, #5288c1);
-            --button-text: var(--tg-theme-button-text-color, #ffffff);
-            --accent-blue: #5288c1;
-            --accent-green: #45a049;
-            --accent-yellow: #e0a83a;
-            --accent-red: #e05252;
-            --border: rgba(255,255,255,0.07);
-            --radius: 12px;
-            --radius-sm: 8px;
-        }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        html, body {
-            height: 100%;
-            background: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 15px;
-            line-height: 1.5;
-            overscroll-behavior: none;
-        }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 90px;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-        #app {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
+    /* ── HEADER ── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(15,15,19,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-logo {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: var(--accent);
+      flex: 1;
+    }
+    .header-user {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: right;
+    }
+    .header-user strong {
+      display: block;
+      color: var(--text);
+      font-size: 14px;
+    }
 
-        /* ── Header ─────────────────────────────────── */
-        .header {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            padding: 0.9rem 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 12px 16px 0;
+    }
+    .tab {
+      flex: 1;
+      padding: 8px 0;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
 
-        .header-logo {
-            font-size: 1.4rem;
-            line-height: 1;
-        }
+    /* ── SECTION ── */
+    .section { padding: 16px 16px 0; }
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
 
-        .header-title {
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: var(--text);
-            flex: 1;
-        }
+    /* ── PACK CARD ── */
+    .pack-list { display: flex; flex-direction: column; gap: var(--gap); }
+    .pack-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      transition: background 0.15s;
+    }
+    .pack-card:active { background: var(--surface2); }
+    .pack-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .pack-name {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: "SF Mono", "Fira Code", monospace;
+      margin-bottom: 12px;
+    }
+    .pack-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      flex: 1;
+      padding: 9px 0;
+      border-radius: 9px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:active { opacity: 0.75; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-ghost {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
 
-        .user-badge {
-            display: flex;
-            align-items: center;
-            gap: 0.45rem;
-            background: rgba(82, 136, 193, 0.15);
-            border: 1px solid rgba(82, 136, 193, 0.25);
-            border-radius: 20px;
-            padding: 0.25rem 0.65rem;
-            font-size: 0.75rem;
-            color: var(--link);
-            max-width: 140px;
-            overflow: hidden;
-        }
+    /* ── EMPTY STATE ── */
+    .empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .empty-body { font-size: 14px; line-height: 1.5; }
 
-        .user-badge-name {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
+    /* ── LOADER ── */
+    .loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 24px;
+      gap: 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── Tabs ───────────────────────────────────── */
-        .tabs {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-        }
+    /* ── ERROR ── */
+    .error-banner {
+      background: rgba(255,95,114,0.12);
+      border: 1px solid rgba(255,95,114,0.25);
+      color: var(--danger);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      margin: 16px;
+    }
 
-        .tab-btn {
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
-            color: var(--hint);
-            padding: 0.75rem 0.5rem;
-            font-size: 0.78rem;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.2rem;
-            transition: color 0.15s, border-color 0.15s;
-        }
+    /* ── STAT ROW ── */
+    .stat-row {
+      display: flex;
+      gap: 10px;
+      padding: 14px 16px;
+    }
+    .stat-card {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+    .stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
 
-        .tab-btn .tab-icon {
-            font-size: 1.2rem;
-        }
+    /* ── BOTTOM CTA ── */
+    .bottom-cta {
+      position: fixed;
+      bottom: 0;
+      left: 0; right: 0;
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      background: rgba(15,15,19,0.96);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+    }
+    .cta-btn {
+      flex: 1;
+      padding: 13px 0;
+      border-radius: 12px;
+      border: none;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: opacity 0.15s;
+    }
+    .cta-btn:active { opacity: 0.75; }
+    .cta-create {
+      background: linear-gradient(135deg, var(--accent), #7b4fcf);
+      color: #fff;
+    }
+    .cta-magic {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
 
-        .tab-btn.active {
-            color: var(--button);
-            border-bottom-color: var(--button);
-        }
+    /* ── SETTINGS ── */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: var(--gap);
+    }
+    .setting-info { flex: 1; }
+    .setting-name { font-size: 15px; font-weight: 600; }
+    .setting-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .toggle {
+      position: relative;
+      width: 46px; height: 26px;
+      cursor: pointer;
+    }
+    .toggle input { display: none; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--surface2);
+      border-radius: 13px;
+      border: 1px solid var(--border);
+      transition: background 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--accent); border-color: var(--accent); }
+    .toggle-thumb {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 20px; height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: left 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .toggle input:checked ~ .toggle-thumb { left: 23px; }
 
-        /* ── Content ────────────────────────────────── */
-        .content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-        }
-
-        .tab-panel {
-            display: none;
-            animation: fadeIn 0.18s ease;
-        }
-
-        .tab-panel.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(4px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ── Color-block section headers ────────────── */
-        .section-header {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            border-radius: var(--radius-sm);
-            padding: 0.65rem 0.85rem;
-            margin-bottom: 1rem;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .section-header.blue  { background: rgba(82, 136, 193, 0.18); color: #7ab3e0; }
-        .section-header.green { background: rgba(69, 160, 73, 0.18);  color: #7fcf83; }
-        .section-header.yellow{ background: rgba(224, 168, 58, 0.18); color: #e8c068; }
-
-        /* ── Form elements ──────────────────────────── */
-        .form-group {
-            margin-bottom: 0.85rem;
-        }
-
-        label {
-            display: block;
-            font-size: 0.8rem;
-            color: var(--hint);
-            margin-bottom: 0.35rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        input[type="text"],
-        select,
-        textarea {
-            width: 100%;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text);
-            padding: 0.7rem 0.85rem;
-            font-size: 0.95rem;
-            outline: none;
-            transition: border-color 0.15s;
-            appearance: none;
-            -webkit-appearance: none;
-        }
-
-        input[type="text"]:focus,
-        select:focus,
-        textarea:focus {
-            border-color: var(--button);
-        }
-
-        input[type="text"]::placeholder,
-        textarea::placeholder {
-            color: var(--hint);
-            opacity: 0.6;
-        }
-
-        select option {
-            background: var(--bg-secondary);
-            color: var(--text);
-        }
-
-        /* File upload */
-        .file-upload-area {
-            border: 2px dashed var(--border);
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            text-align: center;
-            cursor: pointer;
-            transition: border-color 0.15s, background 0.15s;
-            position: relative;
-        }
-
-        .file-upload-area:hover,
-        .file-upload-area.dragover {
-            border-color: var(--button);
-            background: rgba(82, 136, 193, 0.07);
-        }
-
-        .file-upload-area input[type="file"] {
-            position: absolute;
-            inset: 0;
-            opacity: 0;
-            cursor: pointer;
-            width: 100%;
-            height: 100%;
-        }
-
-        .file-upload-icon { font-size: 2rem; margin-bottom: 0.4rem; }
-        .file-upload-text { font-size: 0.85rem; color: var(--hint); }
-        .file-upload-name { font-size: 0.85rem; color: var(--link); margin-top: 0.4rem; word-break: break-all; }
-
-        /* ── Buttons ────────────────────────────────── */
-        .btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            width: 100%;
-            padding: 0.8rem 1rem;
-            border: none;
-            border-radius: var(--radius-sm);
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.15s, transform 0.1s;
-            outline: none;
-        }
-
-        .btn:active { transform: scale(0.97); }
-        .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-
-        .btn-primary {
-            background: var(--button);
-            color: var(--button-text);
-        }
-
-        .btn-primary:hover:not(:disabled) { opacity: 0.88; }
-
-        .btn-danger {
-            background: rgba(224, 82, 82, 0.18);
-            color: var(--accent-red);
-            border: 1px solid rgba(224, 82, 82, 0.25);
-        }
-
-        .btn-ghost {
-            background: var(--bg-secondary);
-            color: var(--hint);
-            border: 1px solid var(--border);
-        }
-
-        .btn-icon {
-            width: auto;
-            padding: 0.45rem 0.7rem;
-            font-size: 1rem;
-        }
-
-        /* ── Pack cards ─────────────────────────────── */
-        .pack-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.65rem;
-        }
-
-        .pack-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 0.85rem 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .pack-card-icon {
-            font-size: 1.5rem;
-            flex-shrink: 0;
-        }
-
-        .pack-card-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .pack-card-title {
-            font-weight: 600;
-            font-size: 0.9rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .pack-card-name {
-            font-size: 0.75rem;
-            color: var(--hint);
-        }
-
-        .pack-card-link {
-            font-size: 0.75rem;
-            color: var(--link);
-            text-decoration: none;
-            display: block;
-            margin-top: 0.1rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .pack-card-link:hover { text-decoration: underline; }
-
-        .pack-card-actions {
-            display: flex;
-            gap: 0.35rem;
-            flex-shrink: 0;
-        }
-
-        /* ── Empty / loading / error states ─────────── */
-        .state-box {
-            text-align: center;
-            padding: 2.5rem 1rem;
-            color: var(--hint);
-        }
-
-        .state-box .state-icon {
-            font-size: 2.5rem;
-            margin-bottom: 0.6rem;
-        }
-
-        .state-box p {
-            font-size: 0.85rem;
-            line-height: 1.5;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 22px;
-            height: 22px;
-            border: 3px solid rgba(82, 136, 193, 0.25);
-            border-top-color: var(--button);
-            border-radius: 50%;
-            animation: spin 0.7s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ── Divider ────────────────────────────────── */
-        .divider {
-            border: none;
-            border-top: 1px solid var(--border);
-            margin: 1rem 0;
-        }
-
-        /* ── Info row ───────────────────────────────── */
-        .info-row {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.8rem;
-            color: var(--hint);
-            margin-bottom: 0.75rem;
-        }
-
-        .info-row span { color: var(--text); }
-
-        /* ── Close row ──────────────────────────────── */
-        .close-row {
-            padding: 0.75rem 1rem;
-            display: flex;
-            justify-content: center;
-        }
-
-        .btn-close-app {
-            background: none;
-            border: none;
-            color: var(--hint);
-            font-size: 0.78rem;
-            cursor: pointer;
-            padding: 0.3rem 0.5rem;
-            border-radius: 6px;
-            transition: color 0.15s;
-        }
-
-        .btn-close-app:hover { color: var(--accent-red); }
-    </style>
+    /* hidden */
+    .hidden { display: none !important; }
+  </style>
 </head>
 <body>
-<div id="app">
-    <!-- Header -->
-    <header class="header">
-        <div class="header-logo">✦</div>
-        <div class="header-title">Stix Magic</div>
-        <div class="user-badge" id="user-badge" style="display:none">
-            <span>👤</span>
-            <span class="user-badge-name" id="user-name-display">—</span>
-        </div>
-    </header>
 
-    <!-- Tabs -->
-    <nav class="tabs">
-        <button class="tab-btn active" data-tab="create" onclick="switchTab('create')">
-            <span class="tab-icon">🧪</span>
-            <span>Create</span>
-        </button>
-        <button class="tab-btn" data-tab="add" onclick="switchTab('add')">
-            <span class="tab-icon">🎨</span>
-            <span>Add Sticker</span>
-        </button>
-        <button class="tab-btn" data-tab="packs" onclick="switchTab('packs')">
-            <span class="tab-icon">📦</span>
-            <span>My Packs</span>
-        </button>
-    </nav>
+<!-- HEADER -->
+<div class="header">
+  <div class="header-logo">✦ STIX MAGIC</div>
+  <div class="header-user" id="user-info">
+    <strong id="user-name">Loading…</strong>
+    <span id="user-id-label"></span>
+  </div>
+</div>
 
-    <!-- Content -->
-    <main class="content">
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" data-tab="packs" onclick="switchTab('packs')">📦 My Packs</button>
+  <button class="tab" data-tab="settings" onclick="switchTab('settings')">⚙ Settings</button>
+</div>
 
-        <!-- TAB 1: Create New Pack -->
-        <section id="tab-create" class="tab-panel active">
-            <div class="section-header blue">🧪 Create New Pack</div>
-
-            <div class="form-group">
-                <label for="cp-name">Pack Name</label>
-                <input type="text" id="cp-name" placeholder="e.g. my_cool_pack"
-                       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-            </div>
-
-            <div class="form-group">
-                <label for="cp-title">Pack Title</label>
-                <input type="text" id="cp-title" placeholder="e.g. My Cool Stickers">
-            </div>
-
-            <div class="info-row">
-                <span>📋</span> Pack name must be unique and contain only letters, numbers and underscores.
-            </div>
-
-            <button class="btn btn-primary" id="btn-create-pack">
-                ✦ Create Pack
-            </button>
-        </section>
-
-        <!-- TAB 2: Add Stickers -->
-        <section id="tab-add" class="tab-panel">
-            <div class="section-header green">🎨 Add a Sticker</div>
-
-            <div class="form-group">
-                <label for="as-pack-select">Select Pack</label>
-                <select id="as-pack-select">
-                    <option value="">— choose a pack —</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Image / File</label>
-                <div class="file-upload-area" id="file-drop-zone">
-                    <input type="file" id="as-file" accept="image/*,.webp,.png,.jpg,.jpeg,.gif,.tgs">
-                    <div class="file-upload-icon">📎</div>
-                    <div class="file-upload-text">Tap to choose an image or drag &amp; drop</div>
-                    <div class="file-upload-name" id="file-name-display" style="display:none"></div>
-                </div>
-            </div>
-
-            <div class="info-row">
-                <span>💡</span> Supported: PNG, WEBP, JPEG, GIF, TGS (animated).
-            </div>
-
-            <button class="btn btn-primary" id="btn-add-sticker">
-                🎨 Add Sticker
-            </button>
-
-            <hr class="divider">
-
-            <div id="add-packs-list">
-                <div class="state-box">
-                    <div class="spinner"></div>
-                    <p style="margin-top:0.75rem">Loading your packs…</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- TAB 3: My Packs -->
-        <section id="tab-packs" class="tab-panel">
-            <div class="section-header yellow">📦 My Packs</div>
-
-            <button class="btn btn-ghost" style="margin-bottom:1rem" id="btn-refresh-packs">
-                🔄 Refresh
-            </button>
-
-            <div id="my-packs-list">
-                <div class="state-box">
-                    <div class="spinner"></div>
-                    <p style="margin-top:0.75rem">Loading your packs…</p>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Footer close button -->
-    <div class="close-row">
-        <button class="btn-close-app" onclick="closeApp()">✕ Close</button>
+<!-- ── PACKS TAB ── -->
+<div id="tab-packs">
+  <div id="stat-row" class="stat-row hidden">
+    <div class="stat-card">
+      <div class="stat-num" id="stat-packs">0</div>
+      <div class="stat-label">Packs</div>
     </div>
+    <div class="stat-card">
+      <div class="stat-num" style="color:var(--accent2)">✦</div>
+      <div class="stat-label">stixmagic.com</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Your sticker packs</div>
+    <div id="packs-loader" class="loader">
+      <div class="spinner"></div>
+      Fetching your packs…
+    </div>
+    <div id="packs-error" class="error-banner hidden"></div>
+    <div id="packs-empty" class="empty hidden">
+      <div class="empty-icon">🪄</div>
+      <div class="empty-title">No packs yet</div>
+      <div class="empty-body">Tap <b>Create Pack</b> below to craft your first sticker pack.</div>
+    </div>
+    <div class="pack-list" id="packs-list"></div>
+  </div>
+</div>
+
+<!-- ── SETTINGS TAB ── -->
+<div id="tab-settings" class="hidden">
+  <div class="section" style="margin-top:16px">
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-name">Invert mask</div>
+        <div class="setting-desc">Black = keep, white = remove (flip default)</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-mask" onchange="saveMaskSetting(this.checked)">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="error-banner hidden" id="settings-error"></div>
+  </div>
+</div>
+
+<!-- BOTTOM CTA -->
+<div class="bottom-cta">
+  <button class="cta-btn cta-magic" onclick="openBot('magic')">✂ Magic Cut</button>
+  <button class="cta-btn cta-create" onclick="openBot('create')">🟣 Create Pack</button>
 </div>
 
 <script>
-(function () {
-    'use strict';
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
 
-    // ── Telegram WebApp bootstrap ────────────────────────────────
-    const tg = window.Telegram && window.Telegram.WebApp;
+const user = tg.initDataUnsafe?.user || {};
+const userId = user.id;
+const userName = user.first_name || "User";
 
-    if (tg) {
-        tg.ready();
-        tg.expand();
+document.getElementById("user-name").textContent = userName;
+document.getElementById("user-id-label").textContent = userId ? `ID ${userId}` : "";
+
+// ── Tabs ──
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  document.getElementById("tab-packs").classList.toggle("hidden", name !== "packs");
+  document.getElementById("tab-settings").classList.toggle("hidden", name !== "settings");
+}
+
+// ── Load packs ──
+async function loadPacks() {
+  if (!userId) {
+    showError("packs", "Could not identify your Telegram account. Please re-open this app from the bot.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/miniapp/packs?user_id=${userId}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error?.message || "Unknown error");
+
+    const packs = json.data;
+    document.getElementById("packs-loader").classList.add("hidden");
+    document.getElementById("stat-row").classList.remove("hidden");
+    document.getElementById("stat-packs").textContent = packs.length;
+
+    if (packs.length === 0) {
+      document.getElementById("packs-empty").classList.remove("hidden");
+      return;
     }
 
-    // ── User info ────────────────────────────────────────────────
-    let currentUser = null;
-
-    function initUser() {
-        if (!tg) return;
-
-        try {
-            const initDataUnsafe = tg.initDataUnsafe || {};
-            const user = initDataUnsafe.user;
-            if (user) {
-                currentUser = user;
-                const badge = document.getElementById('user-badge');
-                const nameEl = document.getElementById('user-name-display');
-                const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || String(user.id);
-                nameEl.textContent = displayName;
-                badge.title = `ID: ${user.id}`;
-                badge.style.display = 'flex';
-            }
-        } catch (e) {
-            // Not critical
-        }
-    }
-
-    // ── Tab switching ────────────────────────────────────────────
-    window.switchTab = function (name) {
-        document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-        document.getElementById('tab-' + name).classList.add('active');
-        document.querySelector('[data-tab="' + name + '"]').classList.add('active');
-
-        if (name === 'add' && !packsLoaded) loadPacks();
-        if (name === 'packs' && !packsLoaded) loadPacks();
-    };
-
-    // ── Alert helper ─────────────────────────────────────────────
-    function showAlert(msg) {
-        if (tg && tg.showAlert) {
-            tg.showAlert(msg);
-        } else {
-            alert(msg);
-        }
-    }
-
-    // ── Close app ────────────────────────────────────────────────
-    window.closeApp = function () {
-        if (tg && tg.close) {
-            tg.close();
-        }
-    };
-
-    // ── sendData wrapper ─────────────────────────────────────────
-    function sendData(payload) {
-        const json = JSON.stringify(payload);
-        if (tg && tg.sendData) {
-            tg.sendData(json);
-        } else {
-            // Dev fallback: log to console
-            console.log('[sendData]', json);
-            showAlert('[Dev mode]\n' + json);
-        }
-    }
-
-    // ── Pack data (in-memory cache) ──────────────────────────────
-    let packsCache = [];
-    let packsLoaded = false;
-    let packTimeoutId = null;
-
-    /**
-     * Request the user's packs from the bot via sendData.
-     * In a real flow the bot would push data back through the WebApp;
-     * here we send a "get_packs" request and populate with any data
-     * that was passed via initDataUnsafe or tg.themeParams.
-     * For demonstration the app renders whatever is cached /
-     * returned from the bot via postMessage.
-     */
-    function loadPacks() {
-        // Cancel any pending timeout from a previous load call
-        if (packTimeoutId !== null) {
-            clearTimeout(packTimeoutId);
-            packTimeoutId = null;
-        }
-        packsLoaded = false;
-        renderPacksLoading('add-packs-list');
-        renderPacksLoading('my-packs-list');
-
-        // Ask the bot for packs
-        sendData({ action: 'get_packs' });
-
-        // Listen for bot response via window.onmessage / tg.onEvent
-        // The bot is expected to call: Telegram.WebApp.sendData or
-        // postMessage({ type: 'packs', data: [...] })
-        // We register a listener and also set a timeout for demo.
-        packTimeoutId = setTimeout(function () {
-            packTimeoutId = null;
-            if (!packsLoaded) {
-                packsLoaded = true;
-                // No data received — render empty state
-                if (packsCache.length === 0) {
-                    renderEmptyPacks('add-packs-list');
-                    renderEmptyPacks('my-packs-list');
-                }
-            }
-        }, 4000);
-    }
-
-    // Trusted origins for postMessage (Telegram Web App host)
-    const TRUSTED_ORIGINS = ['https://web.telegram.org', 'https://k.web.telegram.org', 'https://z.web.telegram.org'];
-
-    // Listen for data pushed from the bot / host page
-    window.addEventListener('message', function (event) {
-        // Validate message origin — allow same origin (dev) or known Telegram origins
-        if (event.origin !== window.location.origin && !TRUSTED_ORIGINS.includes(event.origin)) {
-            return;
-        }
-        try {
-            const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-            if (msg && msg.type === 'packs' && Array.isArray(msg.data)) {
-                if (packTimeoutId !== null) {
-                    clearTimeout(packTimeoutId);
-                    packTimeoutId = null;
-                }
-                packsCache = msg.data;
-                packsLoaded = true;
-                populatePackSelect();
-                renderMyPacks();
-            }
-        } catch (e) {
-            console.error('[miniapp] Failed to parse message data:', e);
-        }
+    const list = document.getElementById("packs-list");
+    list.innerHTML = "";
+    packs.forEach(pack => {
+      const card = document.createElement("div");
+      card.className = "pack-card";
+      card.innerHTML = `
+        <div class="pack-title">${escHtml(pack.title)}</div>
+        <div class="pack-name">@${escHtml(pack.name)}</div>
+        <div class="pack-actions">
+          <button class="btn btn-ghost" onclick="addSticker('${escHtml(pack.name)}')">＋ Add Sticker</button>
+          <button class="btn btn-primary" onclick="openPack('${escHtml(pack.name)}')">Open ▸</button>
+        </div>
+      `;
+      list.appendChild(card);
     });
+  } catch (e) {
+    document.getElementById("packs-loader").classList.add("hidden");
+    showError("packs", "Failed to load packs: " + e.message);
+  }
+}
 
-    if (tg) {
-        tg.onEvent('themeChanged', function () {
-            // Theme variables are CSS vars — no JS update needed
-        });
+// ── Load settings ──
+async function loadSettings() {
+  if (!userId) return;
+  try {
+    const res = await fetch(`/api/miniapp/settings?user_id=${userId}`);
+    const json = await res.json();
+    if (json.ok) {
+      document.getElementById("toggle-mask").checked = json.data.mask_inverted;
     }
+  } catch (_) {}
+}
 
-    // ── Render helpers ───────────────────────────────────────────
-    function renderPacksLoading(containerId) {
-        document.getElementById(containerId).innerHTML =
-            '<div class="state-box"><div class="spinner"></div>' +
-            '<p style="margin-top:0.75rem">Loading your packs…</p></div>';
-    }
-
-    function renderEmptyPacks(containerId) {
-        document.getElementById(containerId).innerHTML =
-            '<div class="state-box">' +
-            '<div class="state-icon">📭</div>' +
-            '<p>No packs yet.<br>Create your first pack in the <strong>Create</strong> tab!</p>' +
-            '</div>';
-    }
-
-    function populatePackSelect() {
-        const sel = document.getElementById('as-pack-select');
-        sel.innerHTML = '<option value="">— choose a pack —</option>';
-        packsCache.forEach(function (pack) {
-            const opt = document.createElement('option');
-            opt.value = pack.name;
-            opt.textContent = pack.title && pack.title !== pack.name
-                ? pack.title + ' (' + pack.name + ')'
-                : pack.name;
-            sel.appendChild(opt);
-        });
-    }
-
-    function renderMyPacks() {
-        const container = document.getElementById('my-packs-list');
-        if (packsCache.length === 0) {
-            renderEmptyPacks('my-packs-list');
-            return;
-        }
-
-        const list = document.createElement('div');
-        list.className = 'pack-list';
-
-        packsCache.forEach(function (pack) {
-            const card = document.createElement('div');
-            card.className = 'pack-card';
-            const link = 'https://t.me/addstickers/' + encodeURIComponent(pack.name);
-
-            card.innerHTML =
-                '<div class="pack-card-icon">📦</div>' +
-                '<div class="pack-card-info">' +
-                    '<div class="pack-card-title">' + escHtml(pack.title || pack.name) + '</div>' +
-                    '<div class="pack-card-name">' + escHtml(pack.name) + '</div>' +
-                    '<a class="pack-card-link" href="' + escHtml(link) + '" target="_blank" rel="noopener noreferrer">' + escHtml(link) + '</a>' +
-                '</div>' +
-                '<div class="pack-card-actions">' +
-                    '<button class="btn btn-icon btn-ghost" onclick="editPack(\'' + escJs(pack.name) + '\')" title="Edit">✏️</button>' +
-                    '<button class="btn btn-icon btn-danger" onclick="deletePack(\'' + escJs(pack.name) + '\')" title="Delete">🗑</button>' +
-                '</div>';
-
-            list.appendChild(card);
-        });
-
-        container.innerHTML = '';
-        container.appendChild(list);
-    }
-
-    // ── Escape helpers ───────────────────────────────────────────
-    function escHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function escJs(str) {
-        return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    }
-
-    // ── TAB 1: Create Pack ───────────────────────────────────────
-    document.getElementById('btn-create-pack').addEventListener('click', function () {
-        const nameInput  = document.getElementById('cp-name');
-        const titleInput = document.getElementById('cp-title');
-        const packName   = nameInput.value.trim();
-        const packTitle  = titleInput.value.trim();
-
-        if (!packName) {
-            showAlert('Please enter a pack name.');
-            nameInput.focus();
-            return;
-        }
-        if (!packTitle) {
-            showAlert('Please enter a pack title.');
-            titleInput.focus();
-            return;
-        }
-        if (!/^[a-zA-Z0-9_]+$/.test(packName)) {
-            showAlert('Pack name may only contain letters, numbers and underscores.');
-            nameInput.focus();
-            return;
-        }
-
-        sendData({ action: 'create_pack', pack_name: packName, title: packTitle });
+async function saveMaskSetting(val) {
+  if (!userId) return;
+  try {
+    const res = await fetch(`/api/miniapp/settings?user_id=${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mask_inverted: val })
     });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error?.message || "Save failed");
+  } catch (e) {
+    showError("settings", "Could not save: " + e.message);
+    document.getElementById("toggle-mask").checked = !val;
+  }
+}
 
-    // ── TAB 2: Add Sticker ───────────────────────────────────────
-    const fileInput   = document.getElementById('as-file');
-    const fileNameEl  = document.getElementById('file-name-display');
-    const dropZone    = document.getElementById('file-drop-zone');
-    let selectedFile  = null;
+// ── Actions ──
+function openPack(name) {
+  tg.openTelegramLink(`https://t.me/addstickers/${name}`);
+}
 
-    fileInput.addEventListener('change', function () {
-        if (fileInput.files && fileInput.files[0]) {
-            selectedFile = fileInput.files[0];
-            fileNameEl.textContent = selectedFile.name;
-            fileNameEl.style.display = 'block';
-        }
-    });
+function addSticker(name) {
+  tg.close();
+  tg.sendData(JSON.stringify({ action: "addto", pack: name }));
+}
 
-    dropZone.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
+function openBot(action) {
+  const botUsername = "stixmagicbot";
+  if (action === "create") {
+    tg.openTelegramLink(`https://t.me/${botUsername}?start=create`);
+  } else {
+    tg.openTelegramLink(`https://t.me/${botUsername}?start=magic`);
+  }
+  tg.close();
+}
 
-    dropZone.addEventListener('dragleave', function () {
-        dropZone.classList.remove('dragover');
-    });
+// ── Helpers ──
+function showError(scope, msg) {
+  if (scope === "packs") {
+    const el = document.getElementById("packs-error");
+    el.textContent = "⚠ " + msg;
+    el.classList.remove("hidden");
+  } else {
+    const el = document.getElementById("settings-error");
+    el.textContent = "⚠ " + msg;
+    el.classList.remove("hidden");
+  }
+}
 
-    dropZone.addEventListener('drop', function (e) {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        const files = e.dataTransfer && e.dataTransfer.files;
-        if (files && files[0]) {
-            selectedFile = files[0];
-            fileNameEl.textContent = selectedFile.name;
-            fileNameEl.style.display = 'block';
-        }
-    });
+function escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
 
-    document.getElementById('btn-add-sticker').addEventListener('click', function () {
-        const packName = document.getElementById('as-pack-select').value;
-
-        if (!packName) {
-            showAlert('Please select a pack first.');
-            return;
-        }
-        if (!selectedFile) {
-            showAlert('Please choose an image file.');
-            return;
-        }
-
-        // Read the file as base64 and send
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            sendData({
-                action: 'add_sticker',
-                pack_name: packName,
-                file: e.target.result,
-                file_name: selectedFile.name,
-            });
-        };
-        reader.onerror = function () {
-            showAlert('Failed to read the file. Please try again.');
-        };
-        reader.readAsDataURL(selectedFile);
-    });
-
-    // ── TAB 3: My Packs actions ──────────────────────────────────
-    document.getElementById('btn-refresh-packs').addEventListener('click', function () {
-        packsCache = [];
-        loadPacks();
-    });
-
-    window.editPack = function (packName) {
-        const pack = packsCache.find(function (p) { return p.name === packName; });
-        if (!pack) return;
-        sendData({ action: 'edit_pack', pack_name: packName, title: pack.title });
-    };
-
-    window.deletePack = function (packName) {
-        // Use Telegram's native confirm dialog when available, otherwise fall back to sendData
-        if (tg && tg.showConfirm) {
-            tg.showConfirm(
-                'Delete pack "' + packName + '"? This action cannot be undone.',
-                function (confirmed) {
-                    if (confirmed) {
-                        sendData({ action: 'delete_pack', pack_name: packName });
-                        packsCache = packsCache.filter(function (p) { return p.name !== packName; });
-                        packsLoaded = true;
-                        renderMyPacks();
-                    }
-                }
-            );
-        } else {
-            showAlert('Delete pack "' + packName + '"?\nThis action cannot be undone.\n(Sending delete request…)');
-            sendData({ action: 'delete_pack', pack_name: packName });
-            packsCache = packsCache.filter(function (p) { return p.name !== packName; });
-            packsLoaded = true;
-            renderMyPacks();
-        }
-    };
-
-    // ── Boot ─────────────────────────────────────────────────────
-    initUser();
-    loadPacks();
-
-}());
+// ── Init ──
+loadPacks();
+loadSettings();
 </script>
 </body>
 </html>
