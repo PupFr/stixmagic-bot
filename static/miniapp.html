@@ -23,51 +23,55 @@
         /* ── CSS Variables — Dark Theme (default) ───── */
         :root,
         [data-theme="dark"] {
-            --bg:           var(--tg-theme-bg-color,           #0e0b1e);
-            --bg2:          var(--tg-theme-secondary-bg-color, #17112e);
-            --bg3:          #1f1840;
-            --text:         var(--tg-theme-text-color,         #ede7ff);
-            --hint:         var(--tg-theme-hint-color,         #8878bb);
-            --link:         var(--tg-theme-link-color,         #b794f4);
-            --btn:          var(--tg-theme-button-color,       #7c3aed);
+            --bg:           var(--tg-theme-bg-color,           #080c18);
+            --bg2:          var(--tg-theme-secondary-bg-color, #0d1222);
+            --bg3:          #12192e;
+            --text:         var(--tg-theme-text-color,         #e0f0ff);
+            --hint:         var(--tg-theme-hint-color,         #4a6080);
+            --link:         var(--tg-theme-link-color,         #818cf8);
+            --btn:          var(--tg-theme-button-color,       #6366f1);
             --btn-text:     var(--tg-theme-button-text-color,  #ffffff);
-            --accent-blue:  #b794f4;
-            --accent-green: #4dbf69;
-            --accent-yellow:#d4a843;
+            --accent-blue:  #00d4ff;
+            --accent-green: #2dd4bf;
+            --accent-yellow:#f97316;
             --accent-red:   #e05c5c;
-            --border:       rgba(155, 93, 229, 0.18);
-            --shadow:       0 4px 24px rgba(0, 0, 0, 0.5);
-            --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.35);
+            --border:       rgba(99, 102, 241, 0.2);
+            --shadow:       0 4px 24px rgba(0, 0, 0, 0.6);
+            --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.4);
             --radius:       14px;
             --radius-sm:    10px;
             --radius-xs:    7px;
-            --header-bg:    rgba(14, 11, 30, 0.97);
-            --tab-bg:       rgba(11, 9, 24, 0.98);
-            --gold:         #d4a843;
-            --gold-dim:     #8a6820;
+            --header-bg:    rgba(8, 12, 24, 0.97);
+            --tab-bg:       rgba(6, 9, 18, 0.98);
+            --cyan:         #00d4ff;
+            --indigo:       #818cf8;
+            --purple:       #a855f7;
+            --pink:         #ec4899;
         }
 
         /* ── CSS Variables — Light Theme ────────────── */
         [data-theme="light"] {
-            --bg:           var(--tg-theme-bg-color,           #f5f0ff);
+            --bg:           var(--tg-theme-bg-color,           #f0f4ff);
             --bg2:          var(--tg-theme-secondary-bg-color, #ffffff);
-            --bg3:          #ede5ff;
-            --text:         var(--tg-theme-text-color,         #1a1030);
-            --hint:         var(--tg-theme-hint-color,         #7c6fa0);
-            --link:         var(--tg-theme-link-color,         #6d28d9);
-            --btn:          var(--tg-theme-button-color,       #7c3aed);
+            --bg3:          #e5eaff;
+            --text:         var(--tg-theme-text-color,         #0d1222);
+            --hint:         var(--tg-theme-hint-color,         #6b7280);
+            --link:         var(--tg-theme-link-color,         #4f46e5);
+            --btn:          var(--tg-theme-button-color,       #4f46e5);
             --btn-text:     var(--tg-theme-button-text-color,  #ffffff);
-            --accent-blue:  #6d28d9;
-            --accent-green: #2ea84a;
-            --accent-yellow:#b8860b;
+            --accent-blue:  #4f46e5;
+            --accent-green: #0d9488;
+            --accent-yellow:#ea580c;
             --accent-red:   #d04040;
-            --border:       rgba(109, 40, 217, 0.12);
-            --shadow:       0 4px 24px rgba(109, 40, 217, 0.1);
-            --shadow-sm:    0 2px 8px rgba(109, 40, 217, 0.07);
+            --border:       rgba(79, 70, 229, 0.15);
+            --shadow:       0 4px 24px rgba(79, 70, 229, 0.1);
+            --shadow-sm:    0 2px 8px rgba(79, 70, 229, 0.07);
             --header-bg:    rgba(255, 255, 255, 0.96);
             --tab-bg:       rgba(255, 255, 255, 0.98);
-            --gold:         #b8860b;
-            --gold-dim:     #d4a843;
+            --cyan:         #0891b2;
+            --indigo:       #4f46e5;
+            --purple:       #7c3aed;
+            --pink:         #db2777;
         }
 
         html, body {
@@ -107,21 +111,24 @@
         .header-logo {
             font-size: 1.5rem;
             line-height: 1;
-            filter: drop-shadow(0 0 8px rgba(155, 93, 229, 0.7));
+            filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.7));
             animation: pulse-glow 3s ease-in-out infinite;
         }
 
         @keyframes pulse-glow {
-            0%, 100% { filter: drop-shadow(0 0 5px rgba(155, 93, 229, 0.5)); }
-            50%       { filter: drop-shadow(0 0 14px rgba(212, 168, 67, 0.85)); }
+            0%, 100% { filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.5)); }
+            50%       { filter: drop-shadow(0 0 14px rgba(168, 85, 247, 0.85)); }
         }
 
         .header-title {
             font-size: 1rem;
-            font-weight: 700;
-            color: var(--gold, #d4a843);
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--cyan, #00d4ff), var(--indigo, #818cf8));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             flex: 1;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.08em;
         }
 
         .user-badge {
@@ -231,7 +238,7 @@
 
         .tab-btn:hover:not(.active) {
             color: var(--text);
-            background: rgba(124, 58, 237, 0.07);
+            background: rgba(99, 102, 241, 0.07);
         }
 
         .tab-btn.active .tab-icon {
@@ -288,21 +295,21 @@
         }
 
         .section-header.blue {
-            background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(124, 58, 237, 0.08));
-            color: var(--accent-blue);
-            border-left: 3px solid var(--accent-blue);
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(99, 102, 241, 0.08));
+            color: var(--cyan, #00d4ff);
+            border-left: 3px solid var(--cyan, #00d4ff);
         }
 
         .section-header.green {
-            background: linear-gradient(135deg, rgba(78, 205, 196, 0.18), rgba(78, 205, 196, 0.06));
-            color: var(--teal, #4ecdc4);
-            border-left: 3px solid var(--teal, #4ecdc4);
+            background: linear-gradient(135deg, rgba(45, 212, 191, 0.15), rgba(45, 212, 191, 0.06));
+            color: var(--accent-green, #2dd4bf);
+            border-left: 3px solid var(--accent-green, #2dd4bf);
         }
 
         .section-header.yellow {
-            background: linear-gradient(135deg, rgba(212, 168, 67, 0.2), rgba(212, 168, 67, 0.08));
-            color: var(--gold, #d4a843);
-            border-left: 3px solid var(--gold, #d4a843);
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(129, 140, 248, 0.08));
+            color: var(--indigo, #818cf8);
+            border-left: 3px solid var(--indigo, #818cf8);
         }
 
         /* ── Form group ─────────────────────────────── */
@@ -348,7 +355,7 @@
         select:focus,
         textarea:focus {
             border-color: var(--btn);
-            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
             background: var(--bg3);
         }
 
@@ -428,8 +435,8 @@
         .file-upload-area:hover,
         .file-upload-area.dragover {
             border-color: var(--btn);
-            background: rgba(124, 58, 237, 0.06);
-            box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
+            background: rgba(99, 102, 241, 0.06);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
         }
 
         .file-upload-area input[type="file"] {
@@ -496,14 +503,14 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #6d28d9, #7c3aed);
+            background: linear-gradient(135deg, #4f46e5, #6366f1, #a855f7);
             color: var(--btn-text);
-            box-shadow: 0 3px 14px rgba(124, 58, 237, 0.4);
+            box-shadow: 0 3px 14px rgba(99, 102, 241, 0.45);
         }
 
         .btn-primary:hover:not(:disabled) {
             opacity: 0.9;
-            box-shadow: 0 5px 20px rgba(124, 58, 237, 0.6);
+            box-shadow: 0 5px 22px rgba(168, 85, 247, 0.6);
             transform: translateY(-1px);
         }
 
@@ -562,7 +569,7 @@
         .pack-card:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow);
-            border-color: rgba(124, 58, 237, 0.3);
+            border-color: rgba(99, 102, 241, 0.35);
         }
 
         .pack-card-icon {
@@ -573,7 +580,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(124, 58, 237, 0.12);
+            background: rgba(99, 102, 241, 0.12);
             border-radius: 10px;
         }
 
@@ -645,7 +652,7 @@
             display: inline-block;
             width: 24px;
             height: 24px;
-            border: 2.5px solid rgba(124, 58, 237, 0.2);
+            border: 2.5px solid rgba(99, 102, 241, 0.2);
             border-top-color: var(--btn);
             border-radius: 50%;
             animation: spin 0.65s linear infinite;
@@ -669,7 +676,7 @@
             color: var(--hint);
             margin-bottom: 0.85rem;
             padding: 0.55rem 0.75rem;
-            background: rgba(124, 58, 237, 0.08);
+            background: rgba(99, 102, 241, 0.08);
             border-radius: var(--radius-xs);
             line-height: 1.5;
         }
@@ -757,8 +764,8 @@
 
     <!-- ── Header ──────────────────────────────────── -->
     <header class="header">
-        <div class="header-logo">🔮</div>
-        <div class="header-title">Stix Magic</div>
+        <div class="header-logo">🪄</div>
+        <div class="header-title">STIX MAGIC</div>
         <div class="user-badge" id="user-badge" title="">
             <i class="fa-solid fa-user" style="font-size:0.65rem"></i>
             <span class="user-badge-name" id="user-name-display">—</span>
@@ -772,12 +779,12 @@
     <nav class="tabs" role="tablist">
         <button class="tab-btn active" data-tab="create" role="tab" aria-selected="true"
                 aria-controls="tab-create" onclick="switchTab('create', this)">
-            <span class="tab-icon">🔮</span>
+            <span class="tab-icon">🪄</span>
             <span>Create</span>
         </button>
         <button class="tab-btn" data-tab="add" role="tab" aria-selected="false"
                 aria-controls="tab-add" onclick="switchTab('add', this)">
-            <span class="tab-icon">⚗️</span>
+            <span class="tab-icon">✨</span>
             <span>Add Sticker</span>
         </button>
         <button class="tab-btn" data-tab="packs" role="tab" aria-selected="false"
@@ -793,7 +800,7 @@
         <!-- TAB 1: Create New Pack -->
         <section id="tab-create" class="tab-panel active" role="tabpanel" aria-labelledby="tab-btn-create">
             <div class="section-header blue">
-                🔮 Create a New Sticker Pack
+                🪄 Create a New Sticker Pack
             </div>
 
             <div class="info-row">
@@ -830,14 +837,14 @@
             </div>
 
             <button class="btn btn-primary" id="btn-create-pack" data-tooltip="Send pack creation request to bot">
-                ✨ Create Pack
+                🪄 Create Pack
             </button>
         </section>
 
         <!-- TAB 2: Add Sticker -->
         <section id="tab-add" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-add">
             <div class="section-header green">
-                ⚗️ Add a Sticker to a Pack
+                ✨ Add a Sticker to a Pack
             </div>
 
             <div class="info-row">
@@ -880,7 +887,7 @@
             </div>
 
             <button class="btn btn-primary" id="btn-add-sticker" data-tooltip="Send sticker to selected pack">
-                ⚗️ Add Sticker
+                ✨ Add Sticker
             </button>
         </section>
 
