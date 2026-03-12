@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stix Magic — Sticker Alchemy</title>
+    <meta name="description" content="Sticker alchemy lab. Transform images into magical stickers on Telegram.">
+    <meta property="og:title" content="Stix Magic — Sticker Alchemy">
+    <meta property="og:description" content="Transform images into magical stickers on Telegram.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://stixmagic.com">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #09090b;
+            color: #d4d4d8;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 460px;
+            width: 100%;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+        }
+
+        .mark {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            letter-spacing: 0.05em;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #fafafa;
+            margin-bottom: 0.3rem;
+        }
+
+        .tagline {
+            font-size: 0.95rem;
+            color: #71717a;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 2.5rem;
+        }
+
+        .features {
+            text-align: left;
+            margin-bottom: 2.5rem;
+        }
+
+        .feature {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.85rem 0;
+            border-bottom: 1px solid #18181b;
+        }
+
+        .feature:last-child { border-bottom: none; }
+
+        .feature-icon {
+            font-size: 1.3rem;
+            flex-shrink: 0;
+            width: 1.8rem;
+            text-align: center;
+            opacity: 0.85;
+        }
+
+        .feature-text h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #e4e4e7;
+            margin-bottom: 0.1rem;
+        }
+
+        .feature-text p {
+            font-size: 0.8rem;
+            color: #52525b;
+            line-height: 1.4;
+        }
+
+        .cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #fafafa;
+            color: #09090b;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 0.85rem 2rem;
+            border-radius: 10px;
+            transition: opacity 0.2s;
+            width: 100%;
+            justify-content: center;
+            letter-spacing: 0.02em;
+        }
+
+        .cta:hover { opacity: 0.88; }
+
+        .footer {
+            margin-top: 3rem;
+            font-size: 0.7rem;
+            color: #27272a;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="mark">✦</div>
+        <h1>STIX MAGIC</h1>
+        <p class="tagline">Sticker Alchemy</p>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">✦</div>
+                <div class="feature-text">
+                    <h3>Create</h3>
+                    <p>Name a pack, send an image. Your sticker pack is live.</p>
+                </div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">✦</div>
+                <div class="feature-text">
+                    <h3>Transform</h3>
+                    <p>Send an image and a mask. Get a clean cutout sticker.</p>
+                </div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">✦</div>
+                <div class="feature-text">
+                    <h3>Collect</h3>
+                    <p>Organize your stickers into packs. Add, manage, share.</p>
+                </div>
+            </div>
+        </div>
+
+        <a href="https://t.me/stixmagicbot" class="cta">
+            Open in Telegram
+        </a>
+
+        <p class="footer">stixmagic.com</p>
+    </div>
+</body>
+</html>
