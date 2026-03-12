@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stix Magic — API Reference</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #09090b;
+            --surface: #111113;
+            --border: #1c1c1f;
+            --muted: #3f3f46;
+            --subtle: #52525b;
+            --text: #d4d4d8;
+            --bright: #fafafa;
+            --purple: #a78bfa;
+            --blue: #60a5fa;
+            --green: #4ade80;
+            --orange: #fb923c;
+            --red: #f87171;
+            --yellow: #fbbf24;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        a { color: var(--blue); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* Layout */
+        .layout { display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--border);
+            padding: 2rem 1.25rem;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .logo {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--bright);
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .logo-sub {
+            font-size: 0.7rem;
+            color: var(--subtle);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+        }
+
+        .nav-group { margin-bottom: 1.5rem; }
+
+        .nav-label {
+            font-size: 0.65rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.3rem 0.5rem;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            color: var(--subtle);
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
+        }
+
+        .nav-item:hover { color: var(--text); background: var(--border); text-decoration: none; }
+        .nav-item .method { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.05em; width: 34px; text-align: center; border-radius: 3px; padding: 1px 4px; }
+        .get { color: var(--green); background: rgba(74, 222, 128, 0.1); }
+        .post { color: var(--blue); background: rgba(96, 165, 250, 0.1); }
+        .patch { color: var(--yellow); background: rgba(251, 191, 36, 0.1); }
+        .delete { color: var(--red); background: rgba(248, 113, 113, 0.1); }
+
+        /* Main content */
+        .main { flex: 1; max-width: 860px; padding: 3rem 2.5rem; }
+
+        /* Sections */
+        .section { margin-bottom: 4rem; }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--bright);
+            margin-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--bright);
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--subtle);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.5rem;
+            margin-top: 1.5rem;
+        }
+
+        p { color: var(--text); font-size: 0.875rem; margin-bottom: 0.75rem; }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            padding: 2px 7px;
+            border-radius: 4px;
+            vertical-align: middle;
+        }
+
+        .badge-public { background: rgba(74, 222, 128, 0.15); color: var(--green); }
+        .badge-auth { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
+
+        /* Endpoint card */
+        .endpoint {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.9rem 1.25rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .method-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            padding: 3px 8px;
+            border-radius: 4px;
+            min-width: 52px;
+            text-align: center;
+        }
+
+        .endpoint-path {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.875rem;
+            color: var(--bright);
+            flex: 1;
+        }
+
+        .endpoint-desc { font-size: 0.78rem; color: var(--subtle); }
+        .endpoint-body { padding: 1.25rem; }
+
+        /* Code block */
+        pre {
+            background: #0d0d0f;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem 1.25rem;
+            overflow-x: auto;
+            font-size: 0.78rem;
+            line-height: 1.7;
+            margin-top: 0.5rem;
+        }
+
+        code { font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace; }
+        .key { color: #60a5fa; }
+        .str { color: #4ade80; }
+        .num { color: #fb923c; }
+        .bool { color: #a78bfa; }
+        .null { color: #71717a; }
+        .comment { color: #3f3f46; }
+
+        /* Params table */
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.5rem; }
+        th {
+            text-align: left;
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            padding: 0.4rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+        tr:last-child td { border-bottom: none; }
+        .param-name { font-family: monospace; color: var(--bright); font-size: 0.8rem; }
+        .param-type { color: var(--purple); font-family: monospace; font-size: 0.75rem; }
+        .param-req { color: var(--orange); font-size: 0.7rem; }
+        .param-opt { color: var(--muted); font-size: 0.7rem; }
+
+        /* Auth box */
+        .info-box {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.82rem;
+        }
+
+        .info-box.purple { border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05); }
+        .info-box.green { border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.05); }
+
+        .base-url {
+            font-family: monospace;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
+            color: var(--green);
+            display: inline-block;
+            margin-top: 0.5rem;
+        }
+
+        @media (max-width: 700px) {
+            .sidebar { display: none; }
+            .main { padding: 2rem 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="logo">✦ STIX MAGIC</div>
+        <div class="logo-sub">API Reference</div>
+
+        <div class="nav-group">
+            <div class="nav-label">Overview</div>
+            <a class="nav-item" href="#overview">Introduction</a>
+            <a class="nav-item" href="#auth">Authentication</a>
+            <a class="nav-item" href="#responses">Responses</a>
+            <a class="nav-item" href="#pagination">Pagination</a>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-label">Endpoints</div>
+            <a class="nav-item" href="#health"><span class="method get">GET</span> Health</a>
+            <a class="nav-item" href="#stats"><span class="method get">GET</span> Stats</a>
+            <a class="nav-item" href="#search"><span class="method get">GET</span> Search</a>
+            <a class="nav-item" href="#packs-list"><span class="method get">GET</span> List Packs</a>
+            <a class="nav-item" href="#packs-get"><span class="method get">GET</span> Get Pack</a>
+            <a class="nav-item" href="#packs-delete"><span class="method delete">DEL</span> Delete Pack</a>
+            <a class="nav-item" href="#settings-get"><span class="method get">GET</span> Settings</a>
+            <a class="nav-item" href="#settings-patch"><span class="method patch">PATCH</span> Settings</a>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-label">Links</div>
+            <a class="nav-item" href="/">← Landing Page</a>
+            <a class="nav-item" href="https://t.me/stixmagicbot">Telegram Bot</a>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+
+        <!-- Overview -->
+        <div class="section" id="overview">
+            <h1>API Reference</h1>
+            <p>The Stix Magic REST API lets external apps read and manage sticker packs created through the Telegram bot.</p>
+
+            <h3>Base URL</h3>
+            <div class="base-url">https://stixmagic.com/api</div>
+
+            <h3>Version</h3>
+            <p>Current version: <code>1.0</code>. The API version is returned in every response header as <code>X-API-Version</code>.</p>
+        </div>
+
+        <!-- Auth -->
+        <div class="section" id="auth">
+            <h2>Authentication</h2>
+            <p>All endpoints except <code>/api/health</code> require an API key.</p>
+
+            <div class="info-box purple">
+                Pass your key via the <code>X-API-Key</code> request header or as an <code>api_key</code> query parameter.
+            </div>
+
+            <h3>Header (recommended)</h3>
+            <pre><code>curl https://stixmagic.com/api/stats \
+  -H <span class="str">"X-API-Key: your_api_key_here"</span></code></pre>
+
+            <h3>Query param</h3>
+            <pre><code>curl <span class="str">"https://stixmagic.com/api/stats?api_key=your_api_key_here"</span></code></pre>
+        </div>
+
+        <!-- Responses -->
+        <div class="section" id="responses">
+            <h2>Response Format</h2>
+            <p>All responses use a consistent JSON envelope.</p>
+
+            <h3>Success</h3>
+            <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: { <span class="comment">/* payload */</span> }
+}</code></pre>
+
+            <h3>Error</h3>
+            <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">false</span>,
+  <span class="key">"error"</span>: {
+    <span class="key">"message"</span>: <span class="str">"Human-readable description"</span>,
+    <span class="key">"code"</span>: <span class="str">"machine_readable_code"</span>
+  }
+}</code></pre>
+
+            <h3>HTTP status codes</h3>
+            <table>
+                <tr><th>Code</th><th>Meaning</th></tr>
+                <tr><td class="param-name">200</td><td>Success</td></tr>
+                <tr><td class="param-name">400</td><td>Bad request (invalid params)</td></tr>
+                <tr><td class="param-name">401</td><td>Unauthorized (missing or wrong API key)</td></tr>
+                <tr><td class="param-name">404</td><td>Resource not found</td></tr>
+                <tr><td class="param-name">405</td><td>Method not allowed</td></tr>
+                <tr><td class="param-name">500</td><td>Server error</td></tr>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="section" id="pagination">
+            <h2>Pagination</h2>
+            <p>List endpoints support cursor-based pagination via query params.</p>
+            <table>
+                <tr><th>Param</th><th>Type</th><th>Default</th><th>Description</th></tr>
+                <tr>
+                    <td class="param-name">page</td>
+                    <td class="param-type">integer</td>
+                    <td>1</td>
+                    <td>Page number (1-indexed)</td>
+                </tr>
+                <tr>
+                    <td class="param-name">limit</td>
+                    <td class="param-type">integer</td>
+                    <td>20</td>
+                    <td>Items per page (max 100)</td>
+                </tr>
+            </table>
+
+            <h3>Pagination in response</h3>
+            <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: [ <span class="comment">/* items */</span> ],
+  <span class="key">"pagination"</span>: {
+    <span class="key">"page"</span>: <span class="num">1</span>,
+    <span class="key">"limit"</span>: <span class="num">20</span>,
+    <span class="key">"total"</span>: <span class="num">47</span>,
+    <span class="key">"pages"</span>: <span class="num">3</span>
+  }
+}</code></pre>
+        </div>
+
+        <!-- HEALTH -->
+        <div class="section" id="health">
+            <h2>Health Check</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge get">GET</span>
+                    <span class="endpoint-path">/api/health</span>
+                    <span class="endpoint-desc">Public — no auth required</span>
+                    <span class="badge badge-public">PUBLIC</span>
+                </div>
+                <div class="endpoint-body">
+                    <p>Returns the current status of the API and database.</p>
+                    <h3>Response</h3>
+                    <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"status"</span>: <span class="str">"ok"</span>,
+    <span class="key">"service"</span>: <span class="str">"stixmagic"</span>,
+    <span class="key">"version"</span>: <span class="str">"1.0"</span>,
+    <span class="key">"db"</span>: <span class="str">"ok"</span>,
+    <span class="key">"timestamp"</span>: <span class="num">1741780000</span>
+  }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- STATS -->
+        <div class="section" id="stats">
+            <h2>Stats</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge get">GET</span>
+                    <span class="endpoint-path">/api/stats</span>
+                    <span class="badge badge-auth">AUTH</span>
+                </div>
+                <div class="endpoint-body">
+                    <p>Global usage statistics across all users.</p>
+                    <h3>Response</h3>
+                    <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"users"</span>: <span class="num">128</span>,
+    <span class="key">"packs"</span>: <span class="num">512</span>,
+    <span class="key">"users_with_settings"</span>: <span class="num">74</span>
+  }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEARCH -->
+        <div class="section" id="search">
+            <h2>Search Packs</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge get">GET</span>
+                    <span class="endpoint-path">/api/search?q={query}</span>
+                    <span class="badge badge-auth">AUTH</span>
+                </div>
+                <div class="endpoint-body">
+                    <p>Search packs by title or Telegram pack name. Supports pagination.</p>
+                    <h3>Query params</h3>
+                    <table>
+                        <tr><th>Param</th><th>Type</th><th></th><th>Description</th></tr>
+                        <tr>
+                            <td class="param-name">q</td>
+                            <td class="param-type">string</td>
+                            <td class="param-req">required</td>
+                            <td>Search query (min 2 chars)</td>
+                        </tr>
+                        <tr>
+                            <td class="param-name">page</td>
+                            <td class="param-type">integer</td>
+                            <td class="param-opt">optional</td>
+                            <td>Page number</td>
+                        </tr>
+                        <tr>
+                            <td class="param-name">limit</td>
+                            <td class="param-type">integer</td>
+                            <td class="param-opt">optional</td>
+                            <td>Items per page (max 100)</td>
+                        </tr>
+                    </table>
+                    <h3>Response</h3>
+                    <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: [
+    {
+      <span class="key">"user_id"</span>: <span class="num">123456789</span>,
+      <span class="key">"name"</span>: <span class="str">"stix_123456789_abcde_by_stixmagicbot"</span>,
+      <span class="key">"title"</span>: <span class="str">"My Cool Pack"</span>,
+      <span class="key">"link"</span>: <span class="str">"https://t.me/addstickers/stix_123456789_abcde_by_stixmagicbot"</span>
+    }
+  ],
+  <span class="key">"query"</span>: <span class="str">"cool"</span>,
+  <span class="key">"pagination"</span>: { <span class="key">"page"</span>: <span class="num">1</span>, <span class="key">"limit"</span>: <span class="num">20</span>, <span class="key">"total"</span>: <span class="num">1</span>, <span class="key">"pages"</span>: <span class="num">1</span> }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIST PACKS -->
+        <div class="section" id="packs-list">
+            <h2>List User Packs</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge get">GET</span>
+                    <span class="endpoint-path">/api/packs/{user_id}</span>
+                    <span class="badge badge-auth">AUTH</span>
+                </div>
+                <div class="endpoint-body">
+                    <p>Returns all sticker packs belonging to a Telegram user. Supports pagination.</p>
+                    <h3>Path params</h3>
+                    <table>
+                        <tr><th>Param</th><th>Type</th><th></th><th>Description</th></tr>
+                        <tr>
+                            <td class="param-name">user_id</td>
+                            <td class="param-type">integer</td>
+                            <td class="param-req">required</td>
+                            <td>Telegram user ID</td>
+                        </tr>
+                    </table>
+                    <h3>Response</h3>
+                    <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: [
+    {
+      <span class="key">"name"</span>: <span class="str">"stix_123456789_abcde_by_stixmagicbot"</span>,
+      <span class="key">"title"</span>: <span class="str">"My Cool Pack"</span>,
+      <span class="key">"link"</span>: <span class="str">"https://t.me/addstickers/stix_123456789_abcde_by_stixmagicbot"</span>
+    }
+  ],
+  <span class="key">"user_id"</span>: <span class="num">123456789</span>,
+  <span class="key">"pagination"</span>: { <span class="key">"page"</span>: <span class="num">1</span>, <span class="key">"limit"</span>: <span class="num">20</span>, <span class="key">"total"</span>: <span class="num">1</span>, <span class="key">"pages"</span>: <span class="num">1</span> }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- GET PACK -->
+        <div class="section" id="packs-get">
+            <h2>Get Pack</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge get">GET</span>
+                    <span class="endpoint-path">/api/packs/{user_id}/{pack_name}</span>
+                    <span class="badge badge-auth">AUTH</span>
+                </div>
+                <div class="endpoint-body">
+                    <p>Returns details for a specific pack.</p>
+                    <h3>Response</h3>
+                    <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"user_id"</span>: <span class="num">123456789</span>,
+    <span class="key">"name"</span>: <span class="str">"stix_123456789_abcde_by_stixmagicbot"</span>,
+    <span class="key">"title"</span>: <span class="str">"My Cool Pack"</span>,
+    <span class="key">"link"</span>: <span class="str">"https://t.me/addstickers/stix_123456789_abcde_by_stixmagicbot"</span>
+  }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- DELETE PACK -->
+        <div class="section" id="packs-delete">
+            <h2>Delete Pack</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge delete">DELETE</span>
+                    <span class="endpoint-path">/api/packs/{user_id}/{pack_name}</span>
+                    <span class="badge badge-auth">AUTH</span>
+                </div>
+                <div class="endpoint-body">
+                    <p>Removes a pack from the Stix Magic database. The Telegram sticker pack itself is unaffected.</p>
+                    <h3>Response</h3>
+                    <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"deleted"</span>: <span class="bool">true</span>,
+    <span class="key">"name"</span>: <span class="str">"stix_123456789_abcde_by_stixmagicbot"</span>
+  }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS GET -->
+        <div class="section" id="settings-get">
+            <h2>Get Settings</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge get">GET</span>
+                    <span class="endpoint-path">/api/settings/{user_id}</span>
+                    <span class="badge badge-auth">AUTH</span>
+                </div>
+                <div class="endpoint-body">
+                    <p>Returns a user's current bot settings.</p>
+                    <h3>Response</h3>
+                    <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"user_id"</span>: <span class="num">123456789</span>,
+    <span class="key">"mask_inverted"</span>: <span class="bool">false</span>
+  }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS PATCH -->
+        <div class="section" id="settings-patch">
+            <h2>Update Settings</h2>
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method-badge patch">PATCH</span>
+                    <span class="endpoint-path">/api/settings/{user_id}</span>
+                    <span class="badge badge-auth">AUTH</span>
+                </div>
+                <div class="endpoint-body">
+                    <p>Updates a user's settings. Send only the fields you want to change.</p>
+                    <h3>Request body</h3>
+                    <pre><code>{
+  <span class="key">"mask_inverted"</span>: <span class="bool">true</span>
+}</code></pre>
+                    <h3>Example</h3>
+                    <pre><code>curl -X PATCH https://stixmagic.com/api/settings/123456789 \
+  -H <span class="str">"X-API-Key: your_api_key_here"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"mask_inverted": true}'</span></code></pre>
+                    <h3>Response</h3>
+                    <pre><code>{
+  <span class="key">"ok"</span>: <span class="bool">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"user_id"</span>: <span class="num">123456789</span>,
+    <span class="key">"mask_inverted"</span>: <span class="bool">true</span>
+  }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+</body>
+</html>
