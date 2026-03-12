@@ -1,495 +1,1256 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Stix Magic</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    :root {
-      --bg: #0f0f13;
-      --surface: #18181f;
-      --surface2: #22222d;
-      --border: rgba(255,255,255,0.07);
-      --accent: #9b6dff;
-      --accent2: #6c9fff;
-      --text: #f0f0f5;
-      --muted: #8888a0;
-      --danger: #ff5f72;
-      --radius: 14px;
-      --gap: 12px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stix Magic</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Inter font for polished typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <style>
+        /* ── Reset & base ───────────────────────────── */
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* ── CSS Variables — Dark Theme (default) ───── */
+        :root,
+        [data-theme="dark"] {
+            --bg:           var(--tg-theme-bg-color,           #17212b);
+            --bg2:          var(--tg-theme-secondary-bg-color, #1f2d3d);
+            --bg3:          #263445;
+            --text:         var(--tg-theme-text-color,         #f0f4f8);
+            --hint:         var(--tg-theme-hint-color,         #7a93ad);
+            --link:         var(--tg-theme-link-color,         #5288c1);
+            --btn:          var(--tg-theme-button-color,       #5288c1);
+            --btn-text:     var(--tg-theme-button-text-color,  #ffffff);
+            --accent-blue:  #5ea8e8;
+            --accent-green: #4dbf69;
+            --accent-yellow:#f0b84a;
+            --accent-red:   #e05c5c;
+            --border:       rgba(255, 255, 255, 0.08);
+            --shadow:       0 4px 24px rgba(0, 0, 0, 0.35);
+            --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.25);
+            --radius:       14px;
+            --radius-sm:    10px;
+            --radius-xs:    7px;
+            --header-bg:    rgba(27, 40, 56, 0.95);
+            --tab-bg:       rgba(23, 33, 43, 0.98);
+        }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding-bottom: 90px;
-      -webkit-tap-highlight-color: transparent;
-    }
+        /* ── CSS Variables — Light Theme ────────────── */
+        [data-theme="light"] {
+            --bg:           var(--tg-theme-bg-color,           #f2f3f5);
+            --bg2:          var(--tg-theme-secondary-bg-color, #ffffff);
+            --bg3:          #e8edf3;
+            --text:         var(--tg-theme-text-color,         #1a1a2e);
+            --hint:         var(--tg-theme-hint-color,         #8a9ab0);
+            --link:         var(--tg-theme-link-color,         #3a7bd5);
+            --btn:          var(--tg-theme-button-color,       #3a7bd5);
+            --btn-text:     var(--tg-theme-button-text-color,  #ffffff);
+            --accent-blue:  #3a7bd5;
+            --accent-green: #2ea84a;
+            --accent-yellow:#d49730;
+            --accent-red:   #d04040;
+            --border:       rgba(0, 0, 0, 0.09);
+            --shadow:       0 4px 24px rgba(0, 0, 0, 0.12);
+            --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.08);
+            --header-bg:    rgba(255, 255, 255, 0.95);
+            --tab-bg:       rgba(255, 255, 255, 0.98);
+        }
 
-    /* ── HEADER ── */
-    .header {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: rgba(15,15,19,0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      padding: 14px 16px 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .header-logo {
-      font-size: 18px;
-      font-weight: 800;
-      letter-spacing: 1px;
-      color: var(--accent);
-      flex: 1;
-    }
-    .header-user {
-      font-size: 13px;
-      color: var(--muted);
-      text-align: right;
-    }
-    .header-user strong {
-      display: block;
-      color: var(--text);
-      font-size: 14px;
-    }
+        html, body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 15px;
+            line-height: 1.5;
+            overscroll-behavior: none;
+            transition: background 0.3s, color 0.3s;
+        }
 
-    /* ── TABS ── */
-    .tabs {
-      display: flex;
-      gap: 2px;
-      padding: 12px 16px 0;
-    }
-    .tab {
-      flex: 1;
-      padding: 8px 0;
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.15s;
-    }
-    .tab.active {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
+        #app {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
 
-    /* ── SECTION ── */
-    .section { padding: 16px 16px 0; }
-    .section-label {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
+        /* ── Header ─────────────────────────────────── */
+        .header {
+            background: var(--header-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 0.7rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-sm);
+            transition: background 0.3s, box-shadow 0.3s;
+        }
 
-    /* ── PACK CARD ── */
-    .pack-list { display: flex; flex-direction: column; gap: var(--gap); }
-    .pack-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      transition: background 0.15s;
-    }
-    .pack-card:active { background: var(--surface2); }
-    .pack-title {
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 3px;
-    }
-    .pack-name {
-      font-size: 12px;
-      color: var(--muted);
-      font-family: "SF Mono", "Fira Code", monospace;
-      margin-bottom: 12px;
-    }
-    .pack-actions {
-      display: flex;
-      gap: 8px;
-    }
-    .btn {
-      flex: 1;
-      padding: 9px 0;
-      border-radius: 9px;
-      border: none;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .btn:active { opacity: 0.75; }
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-    }
-    .btn-ghost {
-      background: var(--surface2);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
+        .header-logo {
+            font-size: 1.35rem;
+            line-height: 1;
+            filter: drop-shadow(0 0 6px rgba(94, 168, 232, 0.5));
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
 
-    /* ── EMPTY STATE ── */
-    .empty {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--muted);
-    }
-    .empty-icon { font-size: 48px; margin-bottom: 12px; }
-    .empty-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
-    .empty-body { font-size: 14px; line-height: 1.5; }
+        @keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 4px rgba(94, 168, 232, 0.4)); }
+            50%       { filter: drop-shadow(0 0 10px rgba(94, 168, 232, 0.8)); }
+        }
 
-    /* ── LOADER ── */
-    .loader {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 60px 24px;
-      gap: 14px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-    .spinner {
-      width: 28px; height: 28px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+        .header-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text);
+            flex: 1;
+            letter-spacing: 0.01em;
+        }
 
-    /* ── ERROR ── */
-    .error-banner {
-      background: rgba(255,95,114,0.12);
-      border: 1px solid rgba(255,95,114,0.25);
-      color: var(--danger);
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 13px;
-      margin: 16px;
-    }
+        .user-badge {
+            display: none;
+            align-items: center;
+            gap: 0.4rem;
+            background: rgba(82, 136, 193, 0.12);
+            border: 1px solid rgba(82, 136, 193, 0.22);
+            border-radius: 20px;
+            padding: 0.22rem 0.6rem;
+            font-size: 0.72rem;
+            color: var(--link);
+            max-width: 130px;
+            overflow: hidden;
+            transition: background 0.2s;
+        }
 
-    /* ── STAT ROW ── */
-    .stat-row {
-      display: flex;
-      gap: 10px;
-      padding: 14px 16px;
-    }
-    .stat-card {
-      flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-      text-align: center;
-    }
-    .stat-num {
-      font-size: 24px;
-      font-weight: 800;
-      color: var(--accent);
-    }
-    .stat-label {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 2px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+        .user-badge:hover {
+            background: rgba(82, 136, 193, 0.2);
+        }
 
-    /* ── BOTTOM CTA ── */
-    .bottom-cta {
-      position: fixed;
-      bottom: 0;
-      left: 0; right: 0;
-      padding: 12px 16px;
-      padding-bottom: max(12px, env(safe-area-inset-bottom));
-      background: rgba(15,15,19,0.96);
-      backdrop-filter: blur(12px);
-      border-top: 1px solid var(--border);
-      display: flex;
-      gap: 10px;
-    }
-    .cta-btn {
-      flex: 1;
-      padding: 13px 0;
-      border-radius: 12px;
-      border: none;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      letter-spacing: 0.3px;
-      transition: opacity 0.15s;
-    }
-    .cta-btn:active { opacity: 0.75; }
-    .cta-create {
-      background: linear-gradient(135deg, var(--accent), #7b4fcf);
-      color: #fff;
-    }
-    .cta-magic {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text);
-    }
+        .user-badge-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
 
-    /* ── SETTINGS ── */
-    .setting-row {
-      display: flex;
-      align-items: center;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      margin-bottom: var(--gap);
-    }
-    .setting-info { flex: 1; }
-    .setting-name { font-size: 15px; font-weight: 600; }
-    .setting-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .toggle {
-      position: relative;
-      width: 46px; height: 26px;
-      cursor: pointer;
-    }
-    .toggle input { display: none; }
-    .toggle-track {
-      position: absolute;
-      inset: 0;
-      background: var(--surface2);
-      border-radius: 13px;
-      border: 1px solid var(--border);
-      transition: background 0.2s;
-    }
-    .toggle input:checked + .toggle-track { background: var(--accent); border-color: var(--accent); }
-    .toggle-thumb {
-      position: absolute;
-      top: 3px; left: 3px;
-      width: 20px; height: 20px;
-      background: #fff;
-      border-radius: 50%;
-      transition: left 0.2s;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-    }
-    .toggle input:checked ~ .toggle-thumb { left: 23px; }
+        /* ── Theme toggle ───────────────────────────── */
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--hint);
+            font-size: 0.85rem;
+            transition: background 0.2s, color 0.2s, transform 0.2s;
+            flex-shrink: 0;
+        }
 
-    /* hidden */
-    .hidden { display: none !important; }
-  </style>
+        .theme-toggle:hover {
+            background: var(--bg3);
+            color: var(--text);
+            transform: rotate(20deg);
+        }
+
+        /* ── Tabs ───────────────────────────────────── */
+        .tabs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            background: var(--tab-bg);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 53px;
+            z-index: 90;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+            transition: background 0.3s;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--hint);
+            padding: 0.65rem 0.4rem;
+            font-size: 0.72rem;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.18rem;
+            transition: color 0.2s, border-color 0.2s, background 0.2s;
+            position: relative;
+        }
+
+        .tab-btn::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 20%;
+            width: 60%;
+            height: 2px;
+            background: var(--btn);
+            border-radius: 2px 2px 0 0;
+            transform: scaleX(0);
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .tab-btn.active::after {
+            transform: scaleX(1);
+        }
+
+        .tab-btn .tab-icon {
+            font-size: 1.05rem;
+            transition: transform 0.2s;
+        }
+
+        .tab-btn.active {
+            color: var(--btn);
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: var(--text);
+            background: rgba(82, 136, 193, 0.06);
+        }
+
+        .tab-btn.active .tab-icon {
+            transform: scale(1.1);
+        }
+
+        /* ── Content area ───────────────────────────── */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 1rem;
+            position: relative;
+        }
+
+        /* ── Tab panel slide transitions ────────────── */
+        .tab-panel {
+            display: none;
+            opacity: 0;
+            transform: translateX(16px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .tab-panel.active {
+            display: block;
+            animation: slideIn 0.25s ease forwards;
+        }
+
+        .tab-panel.slide-left {
+            animation: slideInLeft 0.25s ease forwards;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(14px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-14px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ── Section headers ────────────────────────── */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            border-radius: var(--radius-sm);
+            padding: 0.6rem 0.85rem;
+            margin-bottom: 1.1rem;
+            font-weight: 600;
+            font-size: 0.88rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .section-header.blue {
+            background: linear-gradient(135deg, rgba(82, 136, 193, 0.2), rgba(82, 136, 193, 0.1));
+            color: var(--accent-blue);
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .section-header.green {
+            background: linear-gradient(135deg, rgba(69, 160, 73, 0.2), rgba(69, 160, 73, 0.1));
+            color: var(--accent-green);
+            border-left: 3px solid var(--accent-green);
+        }
+
+        .section-header.yellow {
+            background: linear-gradient(135deg, rgba(224, 168, 58, 0.2), rgba(224, 168, 58, 0.1));
+            color: var(--accent-yellow);
+            border-left: 3px solid var(--accent-yellow);
+        }
+
+        /* ── Form group ─────────────────────────────── */
+        .form-group {
+            margin-bottom: 0.9rem;
+        }
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--hint);
+            margin-bottom: 0.4rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        label i {
+            font-size: 0.7rem;
+        }
+
+        /* ── Inputs ─────────────────────────────────── */
+        input[type="text"],
+        select,
+        textarea {
+            width: 100%;
+            background: var(--bg2);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            padding: 0.7rem 0.9rem;
+            font-size: 0.93rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="text"]:focus,
+        select:focus,
+        textarea:focus {
+            border-color: var(--btn);
+            box-shadow: 0 0 0 3px rgba(82, 136, 193, 0.18);
+            background: var(--bg3);
+        }
+
+        input[type="text"]::placeholder,
+        textarea::placeholder {
+            color: var(--hint);
+            opacity: 0.55;
+        }
+
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a93ad' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.85rem center;
+            padding-right: 2.5rem;
+        }
+
+        select option {
+            background: var(--bg2);
+            color: var(--text);
+        }
+
+        /* ── Helper text ────────────────────────────── */
+        .helper-text {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+            color: var(--hint);
+            margin-top: 0.3rem;
+            line-height: 1.4;
+        }
+
+        .helper-text i {
+            margin-top: 0.12rem;
+            flex-shrink: 0;
+        }
+
+        /* ── Tooltip ─────────────────────────────────── */
+        [data-tooltip] {
+            position: relative;
+        }
+
+        [data-tooltip]::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            font-size: 0.7rem;
+            padding: 0.35rem 0.6rem;
+            border-radius: 6px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 200;
+        }
+
+        [data-tooltip]:hover::before {
+            opacity: 1;
+        }
+
+        /* ── File upload ────────────────────────────── */
+        .file-upload-area {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 1.75rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+            position: relative;
+            background: var(--bg2);
+        }
+
+        .file-upload-area:hover,
+        .file-upload-area.dragover {
+            border-color: var(--btn);
+            background: rgba(82, 136, 193, 0.06);
+            box-shadow: 0 0 0 4px rgba(82, 136, 193, 0.1);
+        }
+
+        .file-upload-area input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .file-upload-icon {
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+            display: block;
+            color: var(--hint);
+        }
+
+        .file-upload-text {
+            font-size: 0.83rem;
+            color: var(--hint);
+            line-height: 1.5;
+        }
+
+        .file-upload-text strong {
+            color: var(--link);
+        }
+
+        .file-upload-name {
+            font-size: 0.83rem;
+            color: var(--link);
+            margin-top: 0.5rem;
+            word-break: break-all;
+            display: none;
+        }
+
+        /* ── Buttons ────────────────────────────────── */
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            padding: 0.78rem 1rem;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.93rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.12s, box-shadow 0.15s, background 0.2s;
+            outline: none;
+            letter-spacing: 0.01em;
+        }
+
+        .btn:active:not(:disabled) {
+            transform: scale(0.97);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: var(--btn);
+            color: var(--btn-text);
+            box-shadow: 0 3px 14px rgba(82, 136, 193, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            opacity: 0.9;
+            box-shadow: 0 5px 20px rgba(82, 136, 193, 0.45);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: rgba(224, 82, 82, 0.14);
+            color: var(--accent-red);
+            border: 1px solid rgba(224, 82, 82, 0.22);
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: rgba(224, 82, 82, 0.22);
+        }
+
+        .btn-ghost {
+            background: var(--bg2);
+            color: var(--hint);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ghost:hover:not(:disabled) {
+            background: var(--bg3);
+            color: var(--text);
+        }
+
+        .btn-icon {
+            width: auto;
+            padding: 0.42rem 0.65rem;
+            font-size: 0.9rem;
+        }
+
+        /* ── Pack cards ─────────────────────────────── */
+        .pack-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .pack-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0.9rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+            animation: cardSlideIn 0.3s ease backwards;
+        }
+
+        @keyframes cardSlideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .pack-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+            border-color: rgba(82, 136, 193, 0.25);
+        }
+
+        .pack-card-icon {
+            font-size: 1.8rem;
+            flex-shrink: 0;
+            width: 2.4rem;
+            height: 2.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(82, 136, 193, 0.1);
+            border-radius: 10px;
+        }
+
+        .pack-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pack-card-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text);
+        }
+
+        .pack-card-name {
+            font-size: 0.73rem;
+            color: var(--hint);
+            margin-top: 0.08rem;
+        }
+
+        .pack-card-link {
+            font-size: 0.73rem;
+            color: var(--link);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-top: 0.12rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            transition: color 0.15s;
+        }
+
+        .pack-card-link:hover {
+            color: var(--accent-blue);
+            text-decoration: underline;
+        }
+
+        .pack-card-actions {
+            display: flex;
+            gap: 0.3rem;
+            flex-shrink: 0;
+        }
+
+        /* ── State boxes ────────────────────────────── */
+        .state-box {
+            text-align: center;
+            padding: 2.5rem 1rem;
+            color: var(--hint);
+        }
+
+        .state-box .state-icon {
+            font-size: 2.8rem;
+            margin-bottom: 0.65rem;
+            display: block;
+        }
+
+        .state-box p {
+            font-size: 0.83rem;
+            line-height: 1.6;
+        }
+
+        /* ── Spinner ────────────────────────────────── */
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 2.5px solid rgba(82, 136, 193, 0.2);
+            border-top-color: var(--btn);
+            border-radius: 50%;
+            animation: spin 0.65s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Divider ─────────────────────────────────── */
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 1rem 0;
+        }
+
+        /* ── Info row ────────────────────────────────── */
+        .info-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            font-size: 0.78rem;
+            color: var(--hint);
+            margin-bottom: 0.85rem;
+            padding: 0.55rem 0.75rem;
+            background: rgba(82, 136, 193, 0.07);
+            border-radius: var(--radius-xs);
+            line-height: 1.5;
+        }
+
+        .info-row i {
+            margin-top: 0.1rem;
+            flex-shrink: 0;
+            color: var(--link);
+        }
+
+        /* ── Character counter ───────────────────────── */
+        .char-counter {
+            font-size: 0.7rem;
+            color: var(--hint);
+            text-align: right;
+            margin-top: 0.25rem;
+        }
+
+        .char-counter.warn { color: var(--accent-yellow); }
+        .char-counter.over { color: var(--accent-red); }
+
+        /* ── Footer close row ────────────────────────── */
+        .close-row {
+            padding: 0.65rem 1rem;
+            display: flex;
+            justify-content: center;
+            border-top: 1px solid var(--border);
+            background: var(--tab-bg);
+        }
+
+        .btn-close-app {
+            background: none;
+            border: none;
+            color: var(--hint);
+            font-size: 0.75rem;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: color 0.15s, background 0.15s;
+        }
+
+        .btn-close-app:hover {
+            color: var(--accent-red);
+            background: rgba(224, 82, 82, 0.08);
+        }
+
+        /* ── Responsive tweaks ───────────────────────── */
+        @media (max-width: 360px) {
+            .content { padding: 0.75rem; }
+            .tab-btn { font-size: 0.67rem; }
+        }
+
+        @media (min-width: 600px) {
+            .content { padding: 1.25rem; }
+            #app { max-width: 540px; margin: 0 auto; }
+        }
+    </style>
 </head>
 <body>
+<div id="app">
 
-<!-- HEADER -->
-<div class="header">
-  <div class="header-logo">✦ STIX MAGIC</div>
-  <div class="header-user" id="user-info">
-    <strong id="user-name">Loading…</strong>
-    <span id="user-id-label"></span>
-  </div>
-</div>
+    <!-- ── Header ──────────────────────────────────── -->
+    <header class="header">
+        <div class="header-logo">✦</div>
+        <div class="header-title">Stix Magic</div>
+        <div class="user-badge" id="user-badge" title="">
+            <i class="fa-solid fa-user" style="font-size:0.65rem"></i>
+            <span class="user-badge-name" id="user-name-display">—</span>
+        </div>
+        <button class="theme-toggle" id="theme-toggle" data-tooltip="Toggle theme" aria-label="Toggle dark/light mode">
+            <i class="fa-solid fa-moon" id="theme-icon"></i>
+        </button>
+    </header>
 
-<!-- TABS -->
-<div class="tabs">
-  <button class="tab active" data-tab="packs" onclick="switchTab('packs')">📦 My Packs</button>
-  <button class="tab" data-tab="settings" onclick="switchTab('settings')">⚙ Settings</button>
-</div>
+    <!-- ── Tabs ────────────────────────────────────── -->
+    <nav class="tabs" role="tablist">
+        <button class="tab-btn active" data-tab="create" role="tab" aria-selected="true"
+                aria-controls="tab-create" onclick="switchTab('create', this)">
+            <i class="fa-solid fa-flask tab-icon"></i>
+            <span>Create</span>
+        </button>
+        <button class="tab-btn" data-tab="add" role="tab" aria-selected="false"
+                aria-controls="tab-add" onclick="switchTab('add', this)">
+            <i class="fa-solid fa-paintbrush tab-icon"></i>
+            <span>Add Sticker</span>
+        </button>
+        <button class="tab-btn" data-tab="packs" role="tab" aria-selected="false"
+                aria-controls="tab-packs" onclick="switchTab('packs', this)">
+            <i class="fa-solid fa-boxes-stacked tab-icon"></i>
+            <span>My Packs</span>
+        </button>
+    </nav>
 
-<!-- ── PACKS TAB ── -->
-<div id="tab-packs">
-  <div id="stat-row" class="stat-row hidden">
-    <div class="stat-card">
-      <div class="stat-num" id="stat-packs">0</div>
-      <div class="stat-label">Packs</div>
+    <!-- ── Content ─────────────────────────────────── -->
+    <main class="content" id="main-content">
+
+        <!-- TAB 1: Create New Pack -->
+        <section id="tab-create" class="tab-panel active" role="tabpanel" aria-labelledby="tab-btn-create">
+            <div class="section-header blue">
+                <i class="fa-solid fa-flask"></i>
+                Create New Pack
+            </div>
+
+            <div class="form-group">
+                <label for="cp-name">
+                    <i class="fa-solid fa-tag"></i>
+                    Pack Name
+                </label>
+                <input type="text" id="cp-name"
+                       placeholder="e.g. my_cool_pack"
+                       maxlength="64"
+                       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                <div class="char-counter" id="cp-name-count">0 / 64</div>
+            </div>
+
+            <div class="form-group">
+                <label for="cp-title">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    Pack Title
+                </label>
+                <input type="text" id="cp-title"
+                       placeholder="e.g. My Cool Stickers"
+                       maxlength="64">
+                <div class="char-counter" id="cp-title-count">0 / 64</div>
+            </div>
+
+            <div class="info-row">
+                <i class="fa-solid fa-circle-info"></i>
+                Pack name must be unique and contain only letters, numbers and underscores. It cannot be changed later.
+            </div>
+
+            <button class="btn btn-primary" id="btn-create-pack" data-tooltip="Send pack creation request to bot">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                Create Pack
+            </button>
+        </section>
+
+        <!-- TAB 2: Add Sticker -->
+        <section id="tab-add" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-add">
+            <div class="section-header green">
+                <i class="fa-solid fa-paintbrush"></i>
+                Add a Sticker
+            </div>
+
+            <div class="form-group">
+                <label for="as-pack-select">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    Select Pack
+                </label>
+                <select id="as-pack-select" aria-label="Choose a sticker pack">
+                    <option value="">— choose a pack —</option>
+                </select>
+                <p class="helper-text">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Select the pack where you want to add this sticker.
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <i class="fa-solid fa-image"></i>
+                    Image / File
+                </label>
+                <div class="file-upload-area" id="file-drop-zone">
+                    <input type="file" id="as-file" accept="image/*,.webp,.png,.jpg,.jpeg,.gif,.tgs" aria-label="Upload sticker image">
+                    <i class="fa-solid fa-cloud-arrow-up file-upload-icon"></i>
+                    <div class="file-upload-text">
+                        <strong>Tap to browse</strong> or drag &amp; drop<br>
+                        PNG, WebP, JPG, GIF, TGS supported
+                    </div>
+                    <div class="file-upload-name" id="file-name-display"></div>
+                </div>
+                <p class="helper-text">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    Max recommended size: 512 × 512 px.
+                </p>
+            </div>
+
+            <button class="btn btn-primary" id="btn-add-sticker" data-tooltip="Send sticker to selected pack">
+                <i class="fa-solid fa-plus"></i>
+                Add Sticker
+            </button>
+        </section>
+
+        <!-- TAB 3: My Packs -->
+        <section id="tab-packs" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-packs">
+            <div class="section-header yellow">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                My Packs
+            </div>
+
+            <button class="btn btn-ghost" style="margin-bottom:1rem" id="btn-refresh-packs"
+                    data-tooltip="Reload your pack list">
+                <i class="fa-solid fa-rotate"></i>
+                Refresh
+            </button>
+
+            <div id="my-packs-list">
+                <div class="state-box">
+                    <div class="spinner"></div>
+                    <p style="margin-top:0.85rem">Loading your packs…</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <div class="close-row">
+        <button class="btn-close-app" onclick="closeApp()">
+            <i class="fa-solid fa-xmark"></i>
+            Close
+        </button>
     </div>
-    <div class="stat-card">
-      <div class="stat-num" style="color:var(--accent2)">✦</div>
-      <div class="stat-label">stixmagic.com</div>
-    </div>
-  </div>
 
-  <div class="section">
-    <div class="section-label">Your sticker packs</div>
-    <div id="packs-loader" class="loader">
-      <div class="spinner"></div>
-      Fetching your packs…
-    </div>
-    <div id="packs-error" class="error-banner hidden"></div>
-    <div id="packs-empty" class="empty hidden">
-      <div class="empty-icon">🪄</div>
-      <div class="empty-title">No packs yet</div>
-      <div class="empty-body">Tap <b>Create Pack</b> below to craft your first sticker pack.</div>
-    </div>
-    <div class="pack-list" id="packs-list"></div>
-  </div>
-</div>
-
-<!-- ── SETTINGS TAB ── -->
-<div id="tab-settings" class="hidden">
-  <div class="section" style="margin-top:16px">
-    <div class="setting-row">
-      <div class="setting-info">
-        <div class="setting-name">Invert mask</div>
-        <div class="setting-desc">Black = keep, white = remove (flip default)</div>
-      </div>
-      <label class="toggle">
-        <input type="checkbox" id="toggle-mask" onchange="saveMaskSetting(this.checked)">
-        <div class="toggle-track"></div>
-        <div class="toggle-thumb"></div>
-      </label>
-    </div>
-    <div class="error-banner hidden" id="settings-error"></div>
-  </div>
-</div>
-
-<!-- BOTTOM CTA -->
-<div class="bottom-cta">
-  <button class="cta-btn cta-magic" onclick="openBot('magic')">✂ Magic Cut</button>
-  <button class="cta-btn cta-create" onclick="openBot('create')">🟣 Create Pack</button>
-</div>
+</div><!-- #app -->
 
 <script>
-const tg = window.Telegram.WebApp;
-tg.ready();
-tg.expand();
+(function () {
+    'use strict';
 
-const user = tg.initDataUnsafe?.user || {};
-const userId = user.id;
-const userName = user.first_name || "User";
+    // ── Telegram WebApp bootstrap ────────────────────────────────
+    var tg = window.Telegram && window.Telegram.WebApp;
 
-document.getElementById("user-name").textContent = userName;
-document.getElementById("user-id-label").textContent = userId ? `ID ${userId}` : "";
-
-// ── Tabs ──
-function switchTab(name) {
-  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
-  document.getElementById("tab-packs").classList.toggle("hidden", name !== "packs");
-  document.getElementById("tab-settings").classList.toggle("hidden", name !== "settings");
-}
-
-// ── Load packs ──
-async function loadPacks() {
-  if (!userId) {
-    showError("packs", "Could not identify your Telegram account. Please re-open this app from the bot.");
-    return;
-  }
-
-  try {
-    const res = await fetch(`/api/miniapp/packs?user_id=${userId}`);
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error?.message || "Unknown error");
-
-    const packs = json.data;
-    document.getElementById("packs-loader").classList.add("hidden");
-    document.getElementById("stat-row").classList.remove("hidden");
-    document.getElementById("stat-packs").textContent = packs.length;
-
-    if (packs.length === 0) {
-      document.getElementById("packs-empty").classList.remove("hidden");
-      return;
+    if (tg) {
+        tg.ready();
+        tg.expand();
     }
 
-    const list = document.getElementById("packs-list");
-    list.innerHTML = "";
-    packs.forEach(pack => {
-      const card = document.createElement("div");
-      card.className = "pack-card";
-      card.innerHTML = `
-        <div class="pack-title">${escHtml(pack.title)}</div>
-        <div class="pack-name">@${escHtml(pack.name)}</div>
-        <div class="pack-actions">
-          <button class="btn btn-ghost" onclick="addSticker('${escHtml(pack.name)}')">＋ Add Sticker</button>
-          <button class="btn btn-primary" onclick="openPack('${escHtml(pack.name)}')">Open ▸</button>
-        </div>
-      `;
-      list.appendChild(card);
-    });
-  } catch (e) {
-    document.getElementById("packs-loader").classList.add("hidden");
-    showError("packs", "Failed to load packs: " + e.message);
-  }
-}
+    // ── Theme management ─────────────────────────────────────────
+    var htmlEl   = document.documentElement;
+    var themeBtn = document.getElementById('theme-toggle');
+    var themeIcon = document.getElementById('theme-icon');
 
-// ── Load settings ──
-async function loadSettings() {
-  if (!userId) return;
-  try {
-    const res = await fetch(`/api/miniapp/settings?user_id=${userId}`);
-    const json = await res.json();
-    if (json.ok) {
-      document.getElementById("toggle-mask").checked = json.data.mask_inverted;
+    // Honour Telegram's color scheme hint if available
+    var prefersDark = tg && tg.colorScheme
+        ? tg.colorScheme === 'dark'
+        : window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    // Saved preference wins
+    var savedTheme = localStorage.getItem('sm-theme');
+    var isDark = savedTheme ? savedTheme === 'dark' : prefersDark;
+
+    function applyTheme(dark) {
+        isDark = dark;
+        htmlEl.setAttribute('data-theme', dark ? 'dark' : 'light');
+        themeIcon.className = dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+        localStorage.setItem('sm-theme', dark ? 'dark' : 'light');
     }
-  } catch (_) {}
-}
 
-async function saveMaskSetting(val) {
-  if (!userId) return;
-  try {
-    const res = await fetch(`/api/miniapp/settings?user_id=${userId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mask_inverted: val })
+    applyTheme(isDark);
+
+    themeBtn.addEventListener('click', function () {
+        applyTheme(!isDark);
     });
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error?.message || "Save failed");
-  } catch (e) {
-    showError("settings", "Could not save: " + e.message);
-    document.getElementById("toggle-mask").checked = !val;
-  }
-}
 
-// ── Actions ──
-function openPack(name) {
-  tg.openTelegramLink(`https://t.me/addstickers/${name}`);
-}
+    if (tg) {
+        tg.onEvent('themeChanged', function () {
+            if (!localStorage.getItem('sm-theme')) {
+                applyTheme(tg.colorScheme === 'dark');
+            }
+        });
+    }
 
-function addSticker(name) {
-  tg.close();
-  tg.sendData(JSON.stringify({ action: "addto", pack: name }));
-}
+    // ── User info ────────────────────────────────────────────────
+    function initUser() {
+        if (!tg) return;
+        try {
+            var user = (tg.initDataUnsafe || {}).user;
+            if (user) {
+                var badge   = document.getElementById('user-badge');
+                var nameEl  = document.getElementById('user-name-display');
+                var display = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || String(user.id);
+                nameEl.textContent = display;
+                badge.title = 'Telegram ID: ' + user.id;
+                badge.style.display = 'flex';
+            }
+        } catch (e) { /* non-critical */ }
+    }
 
-function openBot(action) {
-  const botUsername = "stixmagicbot";
-  if (action === "create") {
-    tg.openTelegramLink(`https://t.me/${botUsername}?start=create`);
-  } else {
-    tg.openTelegramLink(`https://t.me/${botUsername}?start=magic`);
-  }
-  tg.close();
-}
+    // ── Tab switching ────────────────────────────────────────────
+    var currentTab = 'create';
 
-// ── Helpers ──
-function showError(scope, msg) {
-  if (scope === "packs") {
-    const el = document.getElementById("packs-error");
-    el.textContent = "⚠ " + msg;
-    el.classList.remove("hidden");
-  } else {
-    const el = document.getElementById("settings-error");
-    el.textContent = "⚠ " + msg;
-    el.classList.remove("hidden");
-  }
-}
+    window.switchTab = function (name, btnEl) {
+        if (name === currentTab) return;
 
-function escHtml(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
+        var tabOrder = ['create', 'add', 'packs'];
+        var direction = tabOrder.indexOf(name) > tabOrder.indexOf(currentTab) ? '' : 'slide-left';
 
-// ── Init ──
-loadPacks();
-loadSettings();
+        // Hide current
+        var prev = document.getElementById('tab-' + currentTab);
+        if (prev) { prev.classList.remove('active'); }
+
+        // Show new with direction
+        var next = document.getElementById('tab-' + name);
+        if (next) {
+            next.classList.remove('slide-left');
+            next.classList.add('active');
+            if (direction) next.classList.add(direction);
+            // Remove direction class after animation
+            setTimeout(function () { next.classList.remove('slide-left'); }, 280);
+        }
+
+        // Update tab button states
+        document.querySelectorAll('.tab-btn').forEach(function (btn) {
+            btn.classList.remove('active');
+            btn.setAttribute('aria-selected', 'false');
+        });
+        var active = btnEl || document.querySelector('[data-tab="' + name + '"]');
+        if (active) {
+            active.classList.add('active');
+            active.setAttribute('aria-selected', 'true');
+        }
+
+        currentTab = name;
+
+        if ((name === 'add' || name === 'packs') && !packsLoaded) {
+            loadPacks();
+        }
+    };
+
+    // ── Alert helper ─────────────────────────────────────────────
+    function showAlert(msg) {
+        if (tg && tg.showAlert) { tg.showAlert(msg); }
+        else { alert(msg); }
+    }
+
+    // ── Close app ────────────────────────────────────────────────
+    window.closeApp = function () {
+        if (tg && tg.close) { tg.close(); }
+    };
+
+    // ── sendData wrapper ─────────────────────────────────────────
+    function sendData(payload) {
+        var json = JSON.stringify(payload);
+        if (tg && tg.sendData) {
+            tg.sendData(json);
+        } else {
+            console.log('[sendData]', json);
+            showAlert('[Dev mode]\n' + json);
+        }
+    }
+
+    // ── Pack data (in-memory cache) ──────────────────────────────
+    var packsCache    = [];
+    var packsLoaded   = false;
+    var packTimeoutId = null;
+
+    function loadPacks() {
+        if (packTimeoutId !== null) { clearTimeout(packTimeoutId); packTimeoutId = null; }
+        packsLoaded = false;
+        // Show loading state in My Packs list; the Add Sticker tab uses a <select>
+        // populated by populatePackSelect() once data arrives — no separate container.
+        renderPacksLoading('my-packs-list');
+        sendData({ action: 'get_packs' });
+        packTimeoutId = setTimeout(function () {
+            packTimeoutId = null;
+            if (!packsLoaded) {
+                packsLoaded = true;
+                if (packsCache.length === 0) {
+                    renderEmptyPacks('my-packs-list');
+                }
+            }
+        }, 4000);
+    }
+
+    // Trusted origins for postMessage — only explicit Telegram Web App hosts are
+    // accepted; same-origin is intentionally excluded to prevent unvalidated local
+    // messages from populating the pack list in development or embedded contexts.
+    var TRUSTED_ORIGINS = [
+        'https://web.telegram.org',
+        'https://k.web.telegram.org',
+        'https://z.web.telegram.org'
+    ];
+
+    window.addEventListener('message', function (event) {
+        if (!TRUSTED_ORIGINS.includes(event.origin)) return;
+        try {
+            var msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            // Validate expected shape: { type: 'packs', data: [...] }
+            if (msg && typeof msg === 'object' && msg.type === 'packs' && Array.isArray(msg.data)) {
+                if (packTimeoutId !== null) { clearTimeout(packTimeoutId); packTimeoutId = null; }
+                packsCache  = msg.data;
+                packsLoaded = true;
+                populatePackSelect();
+                renderMyPacks();
+            }
+        } catch (e) { console.error('[miniapp] message parse error:', e); }
+    });
+
+    // ── Render helpers ───────────────────────────────────────────
+    function renderPacksLoading(containerId) {
+        var el = document.getElementById(containerId);
+        if (!el) return;
+        el.innerHTML = '<div class="state-box"><div class="spinner"></div>' +
+            '<p style="margin-top:0.85rem">Loading your packs…</p></div>';
+    }
+
+    function renderEmptyPacks(containerId) {
+        var el = document.getElementById(containerId);
+        if (!el) return;
+        el.innerHTML = '<div class="state-box">' +
+            '<span class="state-icon">📭</span>' +
+            '<p>No packs yet.<br>Create your first pack in the <strong>Create</strong> tab!</p></div>';
+    }
+
+    function populatePackSelect() {
+        var sel = document.getElementById('as-pack-select');
+        sel.innerHTML = '<option value="">— choose a pack —</option>';
+        packsCache.forEach(function (pack) {
+            var opt = document.createElement('option');
+            opt.value = pack.name;
+            opt.textContent = (pack.title && pack.title !== pack.name)
+                ? pack.title + ' (' + pack.name + ')' : pack.name;
+            sel.appendChild(opt);
+        });
+    }
+
+    function renderMyPacks() {
+        var container = document.getElementById('my-packs-list');
+        if (!container) return;
+        if (packsCache.length === 0) { renderEmptyPacks('my-packs-list'); return; }
+
+        var list = document.createElement('div');
+        list.className = 'pack-list';
+
+        packsCache.forEach(function (pack, idx) {
+            var card = document.createElement('div');
+            card.className = 'pack-card';
+            card.style.animationDelay = (idx * 55) + 'ms';
+            var link = 'https://t.me/addstickers/' + encodeURIComponent(pack.name);
+            card.innerHTML =
+                '<div class="pack-card-icon">📦</div>' +
+                '<div class="pack-card-info">' +
+                    '<div class="pack-card-title">' + escHtml(pack.title || pack.name) + '</div>' +
+                    '<div class="pack-card-name">' + escHtml(pack.name) + '</div>' +
+                    '<a class="pack-card-link" href="' + escHtml(link) + '" target="_blank" rel="noopener noreferrer">' +
+                        '<i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.6rem"></i>' +
+                        escHtml(link) +
+                    '</a>' +
+                '</div>' +
+                '<div class="pack-card-actions">' +
+                    '<button class="btn btn-icon btn-ghost" onclick="editPack(\'' + escJs(pack.name) + '\')" ' +
+                        'data-tooltip="Edit pack" aria-label="Edit ' + escHtml(pack.name) + '">' +
+                        '<i class="fa-solid fa-pen"></i></button>' +
+                    '<button class="btn btn-icon btn-danger" onclick="deletePack(\'' + escJs(pack.name) + '\')" ' +
+                        'data-tooltip="Delete pack" aria-label="Delete ' + escHtml(pack.name) + '">' +
+                        '<i class="fa-solid fa-trash"></i></button>' +
+                '</div>';
+            list.appendChild(card);
+        });
+
+        container.innerHTML = '';
+        container.appendChild(list);
+    }
+
+    // ── Escape helpers ───────────────────────────────────────────
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function escJs(str) {
+        return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    // ── Character counters ───────────────────────────────────────
+    function setupCharCounter(inputId, counterId, max) {
+        var input   = document.getElementById(inputId);
+        var counter = document.getElementById(counterId);
+        if (!input || !counter) return;
+        function update() {
+            var len = input.value.length;
+            counter.textContent = len + ' / ' + max;
+            counter.className = 'char-counter' + (len > max * 0.9 ? (len >= max ? ' over' : ' warn') : '');
+        }
+        input.addEventListener('input', update);
+        update();
+    }
+
+    setupCharCounter('cp-name',  'cp-name-count',  64);
+    setupCharCounter('cp-title', 'cp-title-count', 64);
+
+    // ── TAB 1: Create Pack ───────────────────────────────────────
+    document.getElementById('btn-create-pack').addEventListener('click', function () {
+        var nameInput  = document.getElementById('cp-name');
+        var titleInput = document.getElementById('cp-title');
+        var packName   = nameInput.value.trim();
+        var packTitle  = titleInput.value.trim();
+
+        if (!packName)  { showAlert('Please enter a pack name.');  nameInput.focus();  return; }
+        if (!packTitle) { showAlert('Please enter a pack title.'); titleInput.focus(); return; }
+        if (!/^[a-zA-Z0-9_]+$/.test(packName)) {
+            showAlert('Pack name may only contain letters, numbers and underscores.');
+            nameInput.focus();
+            return;
+        }
+
+        sendData({ action: 'create_pack', pack_name: packName, title: packTitle });
+    });
+
+    // ── TAB 2: Add Sticker ───────────────────────────────────────
+    var fileInput    = document.getElementById('as-file');
+    var fileNameEl   = document.getElementById('file-name-display');
+    var dropZone     = document.getElementById('file-drop-zone');
+    var selectedFile = null;
+
+    function handleFileSelect(file) {
+        if (!file) return;
+        selectedFile = file;
+        fileNameEl.textContent = file.name;
+        fileNameEl.style.display = 'block';
+    }
+
+    fileInput.addEventListener('change', function () {
+        if (fileInput.files && fileInput.files[0]) handleFileSelect(fileInput.files[0]);
+    });
+
+    dropZone.addEventListener('dragover',  function (e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', function ()  { dropZone.classList.remove('dragover'); });
+    dropZone.addEventListener('drop',      function (e) {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFileSelect(e.dataTransfer.files[0]);
+        }
+    });
+
+    document.getElementById('btn-add-sticker').addEventListener('click', function () {
+        var packName = document.getElementById('as-pack-select').value;
+        if (!packName)    { showAlert('Please select a pack first.'); return; }
+        if (!selectedFile){ showAlert('Please choose an image file.'); return; }
+
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            sendData({ action: 'add_sticker', pack_name: packName, file: e.target.result, file_name: selectedFile.name });
+        };
+        reader.onerror = function () { showAlert('Failed to read the file. Please try again.'); };
+        reader.readAsDataURL(selectedFile);
+    });
+
+    // ── TAB 3: My Packs ─────────────────────────────────────────
+    document.getElementById('btn-refresh-packs').addEventListener('click', function () {
+        packsCache  = [];
+        packsLoaded = false;
+        loadPacks();
+    });
+
+    window.editPack = function (packName) {
+        var pack = packsCache.find(function (p) { return p.name === packName; });
+        if (!pack) return;
+        sendData({ action: 'edit_pack', pack_name: packName, title: pack.title });
+    };
+
+    window.deletePack = function (packName) {
+        function doDelete() {
+            sendData({ action: 'delete_pack', pack_name: packName });
+            packsCache  = packsCache.filter(function (p) { return p.name !== packName; });
+            packsLoaded = true;
+            renderMyPacks();
+        }
+
+        if (tg && tg.showConfirm) {
+            tg.showConfirm('Delete pack "' + packName + '"? This cannot be undone.', function (ok) {
+                if (ok) doDelete();
+            });
+        } else {
+            showAlert('Delete pack "' + packName + '"?\nThis action cannot be undone.\n(Sending delete request…)');
+            doDelete();
+        }
+    };
+
+    // ── Boot ─────────────────────────────────────────────────────
+    initUser();
+    loadPacks();
+
+}());
 </script>
 </body>
 </html>
