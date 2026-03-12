@@ -85,6 +85,12 @@ def landing():
     return send_from_directory(app.static_folder, "index.html")
 
 
+@app.route("/miniapp")
+@app.route("/miniapp/")
+def miniapp():
+    return send_from_directory(app.static_folder, "miniapp.html")
+
+
 @app.route("/api")
 @app.route("/api/")
 def api_docs():
