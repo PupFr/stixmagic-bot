@@ -92,9 +92,9 @@
         }
 
         /* Animated shapes inside SVG */
-        .shape-triangle { animation: shape-drift 5s ease-in-out infinite; transform-origin: 85px 87px; }
-        .shape-square   { animation: shape-drift 6s ease-in-out infinite 0.8s; transform-origin: 94px 121px; }
-        .shape-circle   { animation: shape-drift 4.5s ease-in-out infinite 0.3s; transform-origin: 116px 95px; }
+        .shape-triangle { animation: shape-drift 5s ease-in-out infinite; transform-origin: 82px 107px; }
+        .shape-square   { animation: shape-drift 6s ease-in-out infinite 0.8s; transform-origin: 104px 94px; }
+        .shape-circle   { animation: shape-drift 4.5s ease-in-out infinite 0.3s; transform-origin: 120px 78px; }
         .sparkle-star   { animation: sparkle-pulse 2.5s ease-in-out infinite; }
         .sparkle-dot    { animation: twinkle var(--dur, 3s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
 
@@ -185,9 +185,13 @@
 
         /* ── Footer ─────────────────────────── */
         .footer {
+            display: block;
             margin-top: 2.5rem; font-size: 0.68rem;
             color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase;
+            text-decoration: none;
+            transition: color 0.2s;
         }
+        .footer:hover, .footer:focus { color: var(--cyan); outline: 2px solid var(--cyan); outline-offset: 4px; }
     </style>
 </head>
 <body>
@@ -211,15 +215,15 @@
                     </linearGradient>
                     <linearGradient id="tri-g" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stop-color="#f97316"/>
-                        <stop offset="100%" stop-color="#ec4899"/>
+                        <stop offset="100%" stop-color="#fb7185"/>
                     </linearGradient>
                     <linearGradient id="sq-g" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#06b6d4"/>
-                        <stop offset="100%" stop-color="#6366f1"/>
+                        <stop offset="0%" stop-color="#22d3ee"/>
+                        <stop offset="100%" stop-color="#818cf8"/>
                     </linearGradient>
                     <linearGradient id="cir-g" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#ec4899"/>
-                        <stop offset="100%" stop-color="#a855f7"/>
+                        <stop offset="0%" stop-color="#f472b6"/>
+                        <stop offset="100%" stop-color="#c084fc"/>
                     </linearGradient>
                     <filter id="neon">
                         <feGaussianBlur stdDeviation="2.5" result="blur"/>
@@ -243,21 +247,21 @@
                         fill="none" stroke="url(#star-g)" stroke-width="2.5" stroke-linejoin="round"/>
                 </g>
 
-                <!-- Triangle (outline) - floats up-left -->
+                <!-- Triangle (outline, points RIGHT like logo) - floats lower-left -->
                 <g class="shape-triangle" filter="url(#glow-sm)">
-                    <polygon points="78,99 88,81 98,99"
+                    <polygon points="72,98 72,116 92,107"
                              fill="none" stroke="url(#tri-g)" stroke-width="2.8" stroke-linejoin="round"/>
                 </g>
 
                 <!-- Square (outline) - floats middle -->
                 <g class="shape-square" filter="url(#glow-sm)">
-                    <rect x="85" y="113" width="18" height="18" rx="2"
+                    <rect x="95" y="85" width="18" height="18" rx="2"
                           fill="none" stroke="url(#sq-g)" stroke-width="2.8"/>
                 </g>
 
-                <!-- Circle (outline) - floats right -->
+                <!-- Circle (outline) - floats closest to wand tip -->
                 <g class="shape-circle" filter="url(#glow-sm)">
-                    <circle cx="116" cy="95" r="10"
+                    <circle cx="120" cy="78" r="10"
                             fill="none" stroke="url(#cir-g)" stroke-width="2.8"/>
                 </g>
 
@@ -312,7 +316,7 @@
             ✨ Open in Telegram
         </a>
 
-        <p class="footer">stixmagic.com</p>
+        <a href="https://stixmagic.com" class="footer">stixmagic.com</a>
     </div>
 
     <script>
