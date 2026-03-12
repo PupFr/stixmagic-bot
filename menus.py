@@ -11,7 +11,7 @@ MENU_STRUCTURE = {
             "<i>sticker alchemy at your fingertips</i>\n\n"
             "Send any image. We turn it into\n"
             "a sticker — clean, cut, packed.\n\n"
-            "🟣 <b>create</b>  ·  🔵 <b>explore</b>  ·  🟠 <b>more</b>\n"
+            "🟣 <b>create</b>  ·  🔵 <b>explore</b>  ·  🟠 <b>more</b>  ·  ⭐ <b>premium</b>\n"
         ),
         "buttons": [
             [
@@ -21,6 +21,9 @@ MENU_STRUCTURE = {
             [
                 {"label": "🔵 MY PACKS ▸", "nav": "my_packs"},
                 {"label": "🔵 SETTINGS ▸", "nav": "settings"},
+            ],
+            [
+                {"label": "⭐ AI GENERATE", "action": "menu_generate"},
             ],
             [
                 {"label": "🟠 HELP", "nav": "help"},

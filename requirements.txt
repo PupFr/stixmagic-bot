@@ -1,3 +1,4 @@
 
 python-telegram-bot==21.0.1
 telegram
+openai>=1.0.0
