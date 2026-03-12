@@ -91,6 +91,12 @@ def api_docs():
     return send_from_directory(app.static_folder, "api.html")
 
 
+@app.route("/miniapp")
+@app.route("/miniapp/")
+def miniapp():
+    return send_from_directory(app.static_folder, "miniapp.html")
+
+
 @app.route("/api/health")
 def health():
     conn = get_db()
