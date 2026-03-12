@@ -105,7 +105,7 @@ WAITING_SOURCE_IMAGE, WAITING_MASK_IMAGE, WAITING_CUT_PACK = range(4, 7)
 
 STICKER_EMOJI = ["✨"]
 
-DIV = "─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─"
+DIV = "✦ ─────────────── ✦"
 
 def cancel_keyboard():
     return InlineKeyboardMarkup([[InlineKeyboardButton("✕ Cancel", callback_data="nav:home")]])

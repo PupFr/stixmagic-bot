@@ -1,7 +1,7 @@
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
-DIVIDER = "─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─"
+DIV = "✦ ─────────────── ✦"
 
 def _resolve_miniapp_url():
     url = os.environ.get("MINIAPP_URL", "")
@@ -156,7 +156,7 @@ def get_menu_text(menu_id):
     if not menu:
         return "Menu not found."
 
-    text = f"{menu['header']}\n{DIVIDER}\n\n"
+    text = f"{menu['header']}\n{DIV}\n\n"
     if menu.get("body"):
         text += menu["body"]
 
