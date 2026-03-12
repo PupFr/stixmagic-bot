@@ -1,5 +1,6 @@
 import os
 import re
+import html
 import sqlite3
 import logging
 import io
@@ -339,7 +340,7 @@ async def create_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data['newpack_title'] = title
     await update.message.reply_text(
-        f"✦ <b>{title}</b>\n"
+        f"✦ <b>{html.escape(title)}</b>\n"
         f"{DIV}\n\n"
         "Now send the <b>first sticker</b>.\n\n"
         "◦ Any image, photo, or GIF\n"
@@ -408,7 +409,7 @@ async def create_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await progress.edit_text(
             f"✦ <b>Pack created!</b>\n"
             f"{DIV}\n\n"
-            f"<b>{title}</b>\n"
+            f"<b>{html.escape(title)}</b>\n"
             f"<i>Your first sticker is in.</i>",
             parse_mode="HTML",
             reply_markup=keyboard
@@ -513,7 +514,7 @@ async def addsticker_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pack_title = next((t for n, t in packs if n == pack_name), pack_name)
 
     await query.edit_message_text(
-        f"➕ <b>{pack_title}</b>\n"
+        f"➕ <b>{html.escape(pack_title)}</b>\n"
         f"{DIV}\n\n"
         "Send the sticker to add.\n\n"
         "◦ Image, video, GIF, or existing sticker",
@@ -574,7 +575,7 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await progress.edit_text(
             f"✦ <b>Sticker added</b>\n"
             f"{DIV}\n\n"
-            f"<b>{pack_title}</b> is growing.",
+            f"<b>{html.escape(pack_title)}</b> is growing.",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -587,7 +588,7 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await progress.edit_text(
             f"⚠ <b>Couldn't add sticker</b>\n"
             f"{DIV}\n\n"
-            f"<i>{e}</i>",
+            f"<i>{html.escape(str(e))}</i>",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -771,14 +772,14 @@ async def magic_pack_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  InlineKeyboardButton("✦ Home", callback_data="nav:home")],
             ])
             await query.edit_message_text(
-                f"✦ <b>Added to {pack_title}</b>",
+                f"✦ <b>Added to {html.escape(pack_title)}</b>",
                 parse_mode="HTML",
                 reply_markup=keyboard
             )
         except Exception as e:
             logger.error(f"Error adding cut sticker: {e}")
             await query.edit_message_text(
-                f"⚠ <b>Couldn't add sticker</b>\n\n<i>{e}</i>",
+                f"⚠ <b>Couldn't add sticker</b>\n\n<i>{html.escape(str(e))}</i>",
                 parse_mode="HTML",
                 reply_markup=home_keyboard()
             )
