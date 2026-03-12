@@ -15,6 +15,7 @@ from telegram.ext import (
     ConversationHandler, ContextTypes, CallbackQueryHandler
 )
 from menus import build_keyboard, get_menu_text
+from openai_helper import generate_sticker_image
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -38,6 +39,11 @@ def init_db():
         CREATE TABLE IF NOT EXISTS user_settings (
             user_id INTEGER PRIMARY KEY,
             mask_inverted INTEGER DEFAULT 0
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS premium_users (
+            user_id INTEGER PRIMARY KEY
         )
     ''')
     conn.commit()
@@ -98,11 +104,38 @@ def is_new_user(user_id):
     return packs == 0 and settings == 0
 
 
+def is_premium_user(user_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('SELECT 1 FROM premium_users WHERE user_id = ?', (user_id,))
+    row = c.fetchone()
+    conn.close()
+    return row is not None
+
+
+def grant_premium(user_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('INSERT OR IGNORE INTO premium_users (user_id) VALUES (?)', (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def revoke_premium(user_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('DELETE FROM premium_users WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
+
 WAITING_TITLE, WAITING_STICKER = range(2)
 CHOOSING_PACK, WAITING_STICKER_ADD = range(2, 4)
 WAITING_SOURCE_IMAGE, WAITING_MASK_IMAGE, WAITING_CUT_PACK = range(4, 7)
+WAITING_GENERATE_PROMPT, WAITING_GENERATE_PACK = range(7, 9)
 
 STICKER_EMOJI = ["✨"]
+MAX_PROMPT_LENGTH = 500
 
 DIV = "─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─"
 
@@ -787,6 +820,226 @@ async def magic_pack_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+# ── PREMIUM — ADMIN COMMANDS ─────────────────────────────────
+
+def _get_admin_id():
+    raw = os.environ.get("ADMIN_USER_ID", "")
+    try:
+        return int(raw) if raw.strip() else None
+    except ValueError:
+        return None
+
+
+async def grant_premium_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    admin_id = _get_admin_id()
+    if admin_id is None or update.effective_user.id != admin_id:
+        await update.message.reply_text("⛔ Not authorised.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Usage: /grantpremium <user_id>")
+        return
+
+    try:
+        target_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("⚠ Invalid user ID.")
+        return
+
+    grant_premium(target_id)
+    await update.message.reply_text(f"✦ Premium granted to user <code>{target_id}</code>.", parse_mode="HTML")
+
+
+async def revoke_premium_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    admin_id = _get_admin_id()
+    if admin_id is None or update.effective_user.id != admin_id:
+        await update.message.reply_text("⛔ Not authorised.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Usage: /revokepremium <user_id>")
+        return
+
+    try:
+        target_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("⚠ Invalid user ID.")
+        return
+
+    revoke_premium(target_id)
+    await update.message.reply_text(f"✦ Premium revoked for user <code>{target_id}</code>.", parse_mode="HTML")
+
+
+# ── PREMIUM — AI STICKER GENERATOR ───────────────────────────
+
+async def generate_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    if update.callback_query:
+        await update.callback_query.answer()
+
+    if not is_premium_user(user.id):
+        text = (
+            f"⭐ <b>PREMIUM FEATURE</b>\n"
+            f"{DIV}\n\n"
+            "AI sticker generation is available to\n"
+            "<b>premium members</b> only.\n\n"
+            "<i>Contact the bot admin to upgrade.</i>"
+        )
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("✦ Home", callback_data="nav:home")]])
+        if update.callback_query:
+            await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
+        else:
+            await update.message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
+        return ConversationHandler.END
+
+    text = (
+        f"🤖 <b>AI STICKER GENERATOR</b>\n"
+        f"{DIV}\n\n"
+        "Describe the sticker you want and\n"
+        "DALL-E will bring it to life.\n\n"
+        "<i>Example: \"a cute astronaut cat floating in space\"</i>"
+    )
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=cancel_keyboard())
+    else:
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=cancel_keyboard())
+    return WAITING_GENERATE_PROMPT
+
+
+async def generate_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    prompt = update.message.text.strip()
+    if not prompt:
+        await update.message.reply_text("⚠ Please describe the sticker.", reply_markup=cancel_keyboard())
+        return WAITING_GENERATE_PROMPT
+
+    if len(prompt) > MAX_PROMPT_LENGTH:
+        await update.message.reply_text(
+            "⚠ Description too long — keep it under 500 characters.",
+            reply_markup=cancel_keyboard()
+        )
+        return WAITING_GENERATE_PROMPT
+
+    progress = await update.message.reply_text("🤖 <i>The AI wizard is painting...</i>", parse_mode="HTML")
+
+    image_bytes = generate_sticker_image(prompt)
+
+    if image_bytes is None:
+        await progress.edit_text(
+            f"⚠ <b>Generation failed</b>\n"
+            f"{DIV}\n\n"
+            "Could not reach the AI. Please try again later.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Try Again", callback_data="menu_generate")],
+                [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+            ])
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    converted = convert_to_sticker(image_bytes)
+    if converted is None:
+        await progress.edit_text(
+            "⚠ Image conversion failed. Try a different description.",
+            reply_markup=home_keyboard()
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    context.user_data['generated_sticker'] = converted.getvalue()
+
+    await progress.delete()
+    await update.message.reply_photo(
+        photo=io.BytesIO(context.user_data['generated_sticker']),
+        caption=f"🤖 <b>Preview</b> — <i>{prompt}</i>",
+        parse_mode="HTML"
+    )
+
+    packs = get_user_packs(update.effective_user.id)
+    keyboard_rows = []
+    if packs:
+        for name, title in packs:
+            keyboard_rows.append([InlineKeyboardButton(f"➕ Add to  {title}", callback_data=f"genpack_{name}")])
+    keyboard_rows.append([InlineKeyboardButton("💾 Download File", callback_data="gen_download")])
+    keyboard_rows.append([
+        InlineKeyboardButton("🔄 Generate Another", callback_data="menu_generate"),
+        InlineKeyboardButton("✦ Home", callback_data="nav:home"),
+    ])
+
+    await update.message.reply_text(
+        "What would you like to do with it?",
+        reply_markup=InlineKeyboardMarkup(keyboard_rows)
+    )
+    return WAITING_GENERATE_PACK
+
+
+async def generate_pack_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    sticker_data = context.user_data.get('generated_sticker')
+    if not sticker_data:
+        await query.edit_message_text(
+            "⚠ Sticker data lost. Start over.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Start Over", callback_data="menu_generate")]]),
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    if data == "gen_download":
+        await context.bot.send_document(
+            chat_id=query.message.chat_id,
+            document=io.BytesIO(sticker_data),
+            filename="stixmagic_ai_sticker.webp",
+            caption="🤖 Your AI sticker — ready to use"
+        )
+        await query.edit_message_text(
+            "💾 <b>Downloaded</b>",
+            parse_mode="HTML",
+            reply_markup=home_keyboard()
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    if data.startswith("genpack_"):
+        pack_name = data.replace("genpack_", "")
+        user = query.from_user
+        packs = get_user_packs(user.id)
+        pack_title = next((t for n, t in packs if n == pack_name), pack_name)
+
+        try:
+            sticker_file = io.BytesIO(sticker_data)
+            input_sticker = InputSticker(sticker=sticker_file, emoji_list=STICKER_EMOJI, format="static")
+            await context.bot.add_sticker_to_set(
+                user_id=user.id,
+                name=pack_name,
+                sticker=input_sticker
+            )
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔗 Open Pack", url=f"https://t.me/addstickers/{pack_name}")],
+                [InlineKeyboardButton("🤖 Generate More", callback_data="menu_generate"),
+                 InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+            ])
+            await query.edit_message_text(
+                f"✦ <b>Added to {pack_title}</b>",
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            logger.error(f"Error adding generated sticker: {e}")
+            await query.edit_message_text(
+                f"⚠ <b>Couldn't add sticker</b>\n\n"
+                "<i>Something went wrong. Please try again.</i>",
+                parse_mode="HTML",
+                reply_markup=home_keyboard()
+            )
+
+    context.user_data.clear()
+    return ConversationHandler.END
+
+
 # ── PACKS / MANAGE / HELP / ABOUT ───────────────────────────
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1050,6 +1303,8 @@ def main():
     application.add_handler(CommandHandler("manage", manage_stickers))
     application.add_handler(CommandHandler("help", show_help))
     application.add_handler(CommandHandler("about", show_about))
+    application.add_handler(CommandHandler("grantpremium", grant_premium_cmd))
+    application.add_handler(CommandHandler("revokepremium", revoke_premium_cmd))
 
     create_conv = ConversationHandler(
         entry_points=[CommandHandler("create", create_start), CallbackQueryHandler(create_start, pattern="^menu_create$")],
@@ -1085,6 +1340,19 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)]
     )
     application.add_handler(magic_conv)
+
+    generate_conv = ConversationHandler(
+        entry_points=[
+            CommandHandler("generate", generate_start),
+            CallbackQueryHandler(generate_start, pattern="^menu_generate$"),
+        ],
+        states={
+            WAITING_GENERATE_PROMPT: [MessageHandler(filters.TEXT & ~filters.COMMAND, generate_prompt)],
+            WAITING_GENERATE_PACK: [CallbackQueryHandler(generate_pack_action, pattern="^(genpack_|gen_download)")],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)]
+    )
+    application.add_handler(generate_conv)
 
     application.add_handler(CallbackQueryHandler(nav_callback, pattern="^nav:"))
     application.add_handler(CallbackQueryHandler(menu_callback))
