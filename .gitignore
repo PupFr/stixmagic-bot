@@ -1,30 +1,30 @@
 # Python
-  __pycache__/
-  *.pyc
-  *.pyo
-  *.pyd
-  .Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
-  # Bot
-  bot.db
-  *.log
+# Bot
+bot.db
+*.log
 
-  # Node
-  node_modules/
-  dist/
+# Node
+node_modules/
+dist/
 
-  # Environment
-  .env
-  .env.local
+# Environment
+.env
+.env.local
 
-  # OS
-  .DS_Store
+# OS
+.DS_Store
 
-  # Replit
-  .local/
-  .replit
-  replit.nix
+# Replit
+.local/
+.replit
+replit.nix
 
-  # Archives
-  *.zip
+# Archives
+*.zip
   
