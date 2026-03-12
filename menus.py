@@ -1,7 +1,7 @@
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
-DIVIDER = "─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─"
+DIV = "✦ ─────────────── ✦"
 
 def _resolve_miniapp_url():
     url = os.environ.get("MINIAPP_URL", "")
@@ -16,28 +16,30 @@ MINIAPP_URL = _resolve_miniapp_url()
 MENU_STRUCTURE = {
 
     "home": {
-        "header": "✦ <b>STIX MAGIC</b>",
+        "header": "🔮 <b>STIX MAGIC</b>",
         "body": (
-            "<i>sticker alchemy at your fingertips</i>\n\n"
-            "Send any image. We turn it into\n"
-            "a sticker — clean, cut, packed.\n\n"
-            "🟣 <b>create</b>  ·  🔵 <b>explore</b>  ·  🟠 <b>more</b>\n"
+            "<i>✨ Your sticker alchemy workshop ✨</i>\n\n"
+            "Turn <b>any photo or video</b> into a Telegram sticker in seconds.\n\n"
+            "🟣 <b>Create</b> — start a brand-new sticker pack\n"
+            "⚗️ <b>Magic Cut</b> — cut a subject out of any photo\n"
+            "🔵 <b>My Packs</b> — see all your packs\n"
+            "🟠 <b>Help</b> — new here? start here!\n"
         ),
         "buttons": [
             [
                 {"label": "🟣 CREATE PACK", "action": "menu_create"},
-                {"label": "🟣 MAGIC CUT", "action": "menu_magic"},
+                {"label": "⚗️ MAGIC CUT", "action": "menu_magic"},
             ],
             [
-                {"label": "🔵 MY PACKS ▸", "nav": "my_packs"},
-                {"label": "🔵 SETTINGS ▸", "nav": "settings"},
+                {"label": "🔵 MY PACKS", "nav": "my_packs"},
+                {"label": "🔵 SETTINGS", "nav": "settings"},
             ],
             [
-                {"label": "🟠 HELP", "nav": "help"},
+                {"label": "🟠 HELP — START HERE", "nav": "help"},
                 {"label": "🟠 ABOUT", "action": "menu_about"},
             ],
             [
-                {"label": "🖥 OPEN MINI APP", "web_app": True},
+                {"label": "✨ OPEN MINI APP", "web_app": True},
             ],
         ],
         "parent": None,
@@ -46,16 +48,17 @@ MENU_STRUCTURE = {
     "my_packs": {
         "header": "🔵 <b>MY PACKS</b>",
         "body": (
-            "<i>your sticker collection lives here</i>\n\n"
-            "View, add to, or manage your\n"
-            "existing sticker packs.\n"
+            "<i>Your personal sticker collection 📦</i>\n\n"
+            "Here you can <b>view</b>, <b>add stickers to</b>, or\n"
+            "<b>manage</b> all your packs.\n\n"
+            "🔗 Tap any pack link to open it in Telegram.\n"
         ),
         "buttons": [
             [
-                {"label": "👁‍🗨 VIEW", "action": "menu_packs"},
-                {"label": "＋ ADD", "action": "menu_addsticker"},
+                {"label": "👁 VIEW ALL PACKS", "action": "menu_packs"},
+                {"label": "➕ ADD STICKER", "action": "menu_addsticker"},
             ],
-            [{"label": "⚡ MANAGE", "action": "menu_manage"}],
+            [{"label": "⚡ MANAGE PACKS", "action": "menu_manage"}],
         ],
         "parent": "home",
     },
@@ -63,9 +66,11 @@ MENU_STRUCTURE = {
     "settings": {
         "header": "🔵 <b>SETTINGS</b>",
         "body": (
-            "<i>tune the wizard to your liking</i>\n\n"
-            "Configure how masks and cuts\n"
-            "behave during magic operations.\n"
+            "<i>Tune the magic to your liking ⚙️</i>\n\n"
+            "<b>Mask Mode</b> controls how Magic Cut works:\n\n"
+            "◦ <b>Default:</b> white areas in your mask = <b>keep</b>\n"
+            "◦ <b>Inverted:</b> black areas = <b>keep</b>\n\n"
+            "<i>Flip this if your cutouts look wrong.</i>\n"
         ),
         "buttons": [
             [{"label": "◐ MASK MODE", "action": "settings_mask"}],
@@ -74,31 +79,37 @@ MENU_STRUCTURE = {
     },
 
     "help": {
-        "header": "🟠 <b>HELP</b>",
+        "header": "🟠 <b>HELP — HOW IT WORKS</b>",
         "body": (
-            "<i>learn the craft</i>\n\n"
-            "Everything you need to know\n"
-            "about creating sticker magic.\n"
+            "<i>New here? You're in the right place! 👋</i>\n\n"
+            "Stix Magic is super simple:\n\n"
+            "1️⃣ <b>Create a Pack</b> — give it a name, send one photo.\n"
+            "   Your sticker pack is live on Telegram! 🎉\n\n"
+            "2️⃣ <b>Add More Stickers</b> — pick your pack, send more images.\n\n"
+            "3️⃣ <b>Magic Cut</b> — send a photo + a black‑and‑white mask\n"
+            "   → get a clean cut‑out with no background.\n\n"
+            "That's it! Tap below for detailed steps or quick tips.\n"
         ),
         "buttons": [
             [
-                {"label": "▸ HOW IT WORKS", "action": "menu_help_detail"},
-                {"label": "△ TIPS", "nav": "tips"},
+                {"label": "📖 DETAILED STEPS", "action": "menu_help_detail"},
+                {"label": "💡 QUICK TIPS", "nav": "tips"},
             ],
         ],
         "parent": "home",
     },
 
     "tips": {
-        "header": "🟠 <b>TIPS & TRICKS</b>",
+        "header": "💡 <b>QUICK TIPS</b>",
         "body": (
-            "<i>get the most out of every cut</i>\n\n"
-            "◦ Use <b>PNG</b> with transparency for best results\n"
-            "◦ Ideal size: <b>512 × 512</b> px\n"
-            "◦ Mask: white = keep · black = remove\n"
-            "   <i>(flip this in ⚙ Settings)</i>\n"
-            "◦ Videos & GIFs work as video stickers\n"
-            "◦ Emoji is auto-assigned  ✨\n"
+            "<i>Get the best results every time ✨</i>\n\n"
+            "◦ <b>PNG images</b> with a transparent background work best\n"
+            "◦ Ideal image size: <b>512 × 512 px</b>\n"
+            "◦ For Magic Cut — use a <b>plain black‑and‑white image</b> as your mask\n"
+            "   (white = keep, black = remove — flip in Settings)\n"
+            "◦ <b>Videos & GIFs</b> become animated video stickers automatically\n"
+            "◦ Every sticker gets a ✨ emoji assigned automatically\n"
+            "◦ Can't see your pack? Tap the 🔗 link to add it in Telegram\n"
         ),
         "buttons": [],
         "parent": "help",
@@ -145,7 +156,7 @@ def get_menu_text(menu_id):
     if not menu:
         return "Menu not found."
 
-    text = f"{menu['header']}\n{DIVIDER}\n\n"
+    text = f"{menu['header']}\n{DIV}\n\n"
     if menu.get("body"):
         text += menu["body"]
 

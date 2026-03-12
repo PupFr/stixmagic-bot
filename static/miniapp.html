@@ -23,47 +23,55 @@
         /* ── CSS Variables — Dark Theme (default) ───── */
         :root,
         [data-theme="dark"] {
-            --bg:           var(--tg-theme-bg-color,           #17212b);
-            --bg2:          var(--tg-theme-secondary-bg-color, #1f2d3d);
-            --bg3:          #263445;
-            --text:         var(--tg-theme-text-color,         #f0f4f8);
-            --hint:         var(--tg-theme-hint-color,         #7a93ad);
-            --link:         var(--tg-theme-link-color,         #5288c1);
-            --btn:          var(--tg-theme-button-color,       #5288c1);
+            --bg:           var(--tg-theme-bg-color,           #080c18);
+            --bg2:          var(--tg-theme-secondary-bg-color, #0d1222);
+            --bg3:          #12192e;
+            --text:         var(--tg-theme-text-color,         #e0f0ff);
+            --hint:         var(--tg-theme-hint-color,         #4a6080);
+            --link:         var(--tg-theme-link-color,         #818cf8);
+            --btn:          var(--tg-theme-button-color,       #6366f1);
             --btn-text:     var(--tg-theme-button-text-color,  #ffffff);
-            --accent-blue:  #5ea8e8;
-            --accent-green: #4dbf69;
-            --accent-yellow:#f0b84a;
+            --accent-blue:  #00d4ff;
+            --accent-green: #2dd4bf;
+            --accent-yellow:#f97316;
             --accent-red:   #e05c5c;
-            --border:       rgba(255, 255, 255, 0.08);
-            --shadow:       0 4px 24px rgba(0, 0, 0, 0.35);
-            --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.25);
+            --border:       rgba(99, 102, 241, 0.2);
+            --shadow:       0 4px 24px rgba(0, 0, 0, 0.6);
+            --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.4);
             --radius:       14px;
             --radius-sm:    10px;
             --radius-xs:    7px;
-            --header-bg:    rgba(27, 40, 56, 0.95);
-            --tab-bg:       rgba(23, 33, 43, 0.98);
+            --header-bg:    rgba(8, 12, 24, 0.97);
+            --tab-bg:       rgba(6, 9, 18, 0.98);
+            --cyan:         #00d4ff;
+            --indigo:       #818cf8;
+            --purple:       #a855f7;
+            --pink:         #ec4899;
         }
 
         /* ── CSS Variables — Light Theme ────────────── */
         [data-theme="light"] {
-            --bg:           var(--tg-theme-bg-color,           #f2f3f5);
+            --bg:           var(--tg-theme-bg-color,           #f0f4ff);
             --bg2:          var(--tg-theme-secondary-bg-color, #ffffff);
-            --bg3:          #e8edf3;
-            --text:         var(--tg-theme-text-color,         #1a1a2e);
-            --hint:         var(--tg-theme-hint-color,         #8a9ab0);
-            --link:         var(--tg-theme-link-color,         #3a7bd5);
-            --btn:          var(--tg-theme-button-color,       #3a7bd5);
+            --bg3:          #e5eaff;
+            --text:         var(--tg-theme-text-color,         #0d1222);
+            --hint:         var(--tg-theme-hint-color,         #6b7280);
+            --link:         var(--tg-theme-link-color,         #4f46e5);
+            --btn:          var(--tg-theme-button-color,       #4f46e5);
             --btn-text:     var(--tg-theme-button-text-color,  #ffffff);
-            --accent-blue:  #3a7bd5;
-            --accent-green: #2ea84a;
-            --accent-yellow:#d49730;
+            --accent-blue:  #4f46e5;
+            --accent-green: #0d9488;
+            --accent-yellow:#ea580c;
             --accent-red:   #d04040;
-            --border:       rgba(0, 0, 0, 0.09);
-            --shadow:       0 4px 24px rgba(0, 0, 0, 0.12);
-            --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.08);
-            --header-bg:    rgba(255, 255, 255, 0.95);
+            --border:       rgba(79, 70, 229, 0.15);
+            --shadow:       0 4px 24px rgba(79, 70, 229, 0.1);
+            --shadow-sm:    0 2px 8px rgba(79, 70, 229, 0.07);
+            --header-bg:    rgba(255, 255, 255, 0.96);
             --tab-bg:       rgba(255, 255, 255, 0.98);
+            --cyan:         #0891b2;
+            --indigo:       #4f46e5;
+            --purple:       #7c3aed;
+            --pink:         #db2777;
         }
 
         html, body {
@@ -101,23 +109,26 @@
         }
 
         .header-logo {
-            font-size: 1.35rem;
+            font-size: 1.5rem;
             line-height: 1;
-            filter: drop-shadow(0 0 6px rgba(94, 168, 232, 0.5));
+            filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.7));
             animation: pulse-glow 3s ease-in-out infinite;
         }
 
         @keyframes pulse-glow {
-            0%, 100% { filter: drop-shadow(0 0 4px rgba(94, 168, 232, 0.4)); }
-            50%       { filter: drop-shadow(0 0 10px rgba(94, 168, 232, 0.8)); }
+            0%, 100% { filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.5)); }
+            50%       { filter: drop-shadow(0 0 14px rgba(168, 85, 247, 0.85)); }
         }
 
         .header-title {
             font-size: 1rem;
-            font-weight: 700;
-            color: var(--text);
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--cyan, #00d4ff), var(--indigo, #818cf8));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             flex: 1;
-            letter-spacing: 0.01em;
+            letter-spacing: 0.08em;
         }
 
         .user-badge {
@@ -227,7 +238,7 @@
 
         .tab-btn:hover:not(.active) {
             color: var(--text);
-            background: rgba(82, 136, 193, 0.06);
+            background: rgba(99, 102, 241, 0.07);
         }
 
         .tab-btn.active .tab-icon {
@@ -284,21 +295,21 @@
         }
 
         .section-header.blue {
-            background: linear-gradient(135deg, rgba(82, 136, 193, 0.2), rgba(82, 136, 193, 0.1));
-            color: var(--accent-blue);
-            border-left: 3px solid var(--accent-blue);
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(99, 102, 241, 0.08));
+            color: var(--cyan, #00d4ff);
+            border-left: 3px solid var(--cyan, #00d4ff);
         }
 
         .section-header.green {
-            background: linear-gradient(135deg, rgba(69, 160, 73, 0.2), rgba(69, 160, 73, 0.1));
-            color: var(--accent-green);
-            border-left: 3px solid var(--accent-green);
+            background: linear-gradient(135deg, rgba(45, 212, 191, 0.15), rgba(45, 212, 191, 0.06));
+            color: var(--accent-green, #2dd4bf);
+            border-left: 3px solid var(--accent-green, #2dd4bf);
         }
 
         .section-header.yellow {
-            background: linear-gradient(135deg, rgba(224, 168, 58, 0.2), rgba(224, 168, 58, 0.1));
-            color: var(--accent-yellow);
-            border-left: 3px solid var(--accent-yellow);
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(129, 140, 248, 0.08));
+            color: var(--indigo, #818cf8);
+            border-left: 3px solid var(--indigo, #818cf8);
         }
 
         /* ── Form group ─────────────────────────────── */
@@ -344,7 +355,7 @@
         select:focus,
         textarea:focus {
             border-color: var(--btn);
-            box-shadow: 0 0 0 3px rgba(82, 136, 193, 0.18);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
             background: var(--bg3);
         }
 
@@ -424,8 +435,8 @@
         .file-upload-area:hover,
         .file-upload-area.dragover {
             border-color: var(--btn);
-            background: rgba(82, 136, 193, 0.06);
-            box-shadow: 0 0 0 4px rgba(82, 136, 193, 0.1);
+            background: rgba(99, 102, 241, 0.06);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
         }
 
         .file-upload-area input[type="file"] {
@@ -492,14 +503,14 @@
         }
 
         .btn-primary {
-            background: var(--btn);
+            background: linear-gradient(135deg, #4f46e5, #6366f1, #a855f7);
             color: var(--btn-text);
-            box-shadow: 0 3px 14px rgba(82, 136, 193, 0.3);
+            box-shadow: 0 3px 14px rgba(99, 102, 241, 0.45);
         }
 
         .btn-primary:hover:not(:disabled) {
             opacity: 0.9;
-            box-shadow: 0 5px 20px rgba(82, 136, 193, 0.45);
+            box-shadow: 0 5px 22px rgba(168, 85, 247, 0.6);
             transform: translateY(-1px);
         }
 
@@ -558,7 +569,7 @@
         .pack-card:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow);
-            border-color: rgba(82, 136, 193, 0.25);
+            border-color: rgba(99, 102, 241, 0.35);
         }
 
         .pack-card-icon {
@@ -569,7 +580,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(82, 136, 193, 0.1);
+            background: rgba(99, 102, 241, 0.12);
             border-radius: 10px;
         }
 
@@ -641,7 +652,7 @@
             display: inline-block;
             width: 24px;
             height: 24px;
-            border: 2.5px solid rgba(82, 136, 193, 0.2);
+            border: 2.5px solid rgba(99, 102, 241, 0.2);
             border-top-color: var(--btn);
             border-radius: 50%;
             animation: spin 0.65s linear infinite;
@@ -665,7 +676,7 @@
             color: var(--hint);
             margin-bottom: 0.85rem;
             padding: 0.55rem 0.75rem;
-            background: rgba(82, 136, 193, 0.07);
+            background: rgba(99, 102, 241, 0.08);
             border-radius: var(--radius-xs);
             line-height: 1.5;
         }
@@ -726,15 +737,35 @@
             .content { padding: 1.25rem; }
             #app { max-width: 540px; margin: 0 auto; }
         }
+
+        /* ── Magical star particles (dark theme only) ── */
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.15; }
+            50%       { opacity: 0.7; }
+        }
+
+        .star-particle {
+            position: fixed;
+            background: #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            animation: twinkle var(--dur, 3s) ease-in-out infinite;
+            animation-delay: var(--delay, 0s);
+        }
+
+        [data-theme="light"] .star-particle { display: none; }
     </style>
 </head>
 <body>
 <div id="app">
+    <!-- Magical star particles -->
+    <div id="star-layer" aria-hidden="true"></div>
 
     <!-- ── Header ──────────────────────────────────── -->
     <header class="header">
-        <div class="header-logo">✦</div>
-        <div class="header-title">Stix Magic</div>
+        <div class="header-logo">🪄</div>
+        <div class="header-title">STIX MAGIC</div>
         <div class="user-badge" id="user-badge" title="">
             <i class="fa-solid fa-user" style="font-size:0.65rem"></i>
             <span class="user-badge-name" id="user-name-display">—</span>
@@ -748,17 +779,17 @@
     <nav class="tabs" role="tablist">
         <button class="tab-btn active" data-tab="create" role="tab" aria-selected="true"
                 aria-controls="tab-create" onclick="switchTab('create', this)">
-            <i class="fa-solid fa-flask tab-icon"></i>
+            <span class="tab-icon">🪄</span>
             <span>Create</span>
         </button>
         <button class="tab-btn" data-tab="add" role="tab" aria-selected="false"
                 aria-controls="tab-add" onclick="switchTab('add', this)">
-            <i class="fa-solid fa-paintbrush tab-icon"></i>
+            <span class="tab-icon">✨</span>
             <span>Add Sticker</span>
         </button>
         <button class="tab-btn" data-tab="packs" role="tab" aria-selected="false"
                 aria-controls="tab-packs" onclick="switchTab('packs', this)">
-            <i class="fa-solid fa-boxes-stacked tab-icon"></i>
+            <span class="tab-icon">📦</span>
             <span>My Packs</span>
         </button>
     </nav>
@@ -769,14 +800,18 @@
         <!-- TAB 1: Create New Pack -->
         <section id="tab-create" class="tab-panel active" role="tabpanel" aria-labelledby="tab-btn-create">
             <div class="section-header blue">
-                <i class="fa-solid fa-flask"></i>
-                Create New Pack
+                🪄 Create a New Sticker Pack
+            </div>
+
+            <div class="info-row">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Give your pack a name, then send a photo or video to the bot — and your sticker pack is live on Telegram! ✨</span>
             </div>
 
             <div class="form-group">
                 <label for="cp-name">
                     <i class="fa-solid fa-tag"></i>
-                    Pack Name
+                    Pack Name <span style="color:var(--hint);font-weight:400">(unique ID — letters, numbers, _)</span>
                 </label>
                 <input type="text" id="cp-name"
                        placeholder="e.g. my_cool_pack"
@@ -788,7 +823,7 @@
             <div class="form-group">
                 <label for="cp-title">
                     <i class="fa-solid fa-pen-to-square"></i>
-                    Pack Title
+                    Display Title <span style="color:var(--hint);font-weight:400">(shown to everyone)</span>
                 </label>
                 <input type="text" id="cp-title"
                        placeholder="e.g. My Cool Stickers"
@@ -797,27 +832,30 @@
             </div>
 
             <div class="info-row">
-                <i class="fa-solid fa-circle-info"></i>
-                Pack name must be unique and contain only letters, numbers and underscores. It cannot be changed later.
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                The Pack Name can only contain letters, numbers and underscores — and cannot be changed later.
             </div>
 
             <button class="btn btn-primary" id="btn-create-pack" data-tooltip="Send pack creation request to bot">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                Create Pack
+                🪄 Create Pack
             </button>
         </section>
 
         <!-- TAB 2: Add Sticker -->
         <section id="tab-add" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-add">
             <div class="section-header green">
-                <i class="fa-solid fa-paintbrush"></i>
-                Add a Sticker
+                ✨ Add a Sticker to a Pack
+            </div>
+
+            <div class="info-row">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Pick one of your packs below, upload an image, and it'll be added as a new sticker. PNG or JPG work best!</span>
             </div>
 
             <div class="form-group">
                 <label for="as-pack-select">
                     <i class="fa-solid fa-boxes-stacked"></i>
-                    Select Pack
+                    Which pack?
                 </label>
                 <select id="as-pack-select" aria-label="Choose a sticker pack">
                     <option value="">— choose a pack —</option>
@@ -844,21 +882,24 @@
                 </div>
                 <p class="helper-text">
                     <i class="fa-solid fa-triangle-exclamation"></i>
-                    Max recommended size: 512 × 512 px.
+                    Best size: 512 × 512 px. Larger images are resized automatically.
                 </p>
             </div>
 
             <button class="btn btn-primary" id="btn-add-sticker" data-tooltip="Send sticker to selected pack">
-                <i class="fa-solid fa-plus"></i>
-                Add Sticker
+                ✨ Add Sticker
             </button>
         </section>
 
         <!-- TAB 3: My Packs -->
         <section id="tab-packs" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-packs">
             <div class="section-header yellow">
-                <i class="fa-solid fa-boxes-stacked"></i>
-                My Packs
+                📦 My Packs
+            </div>
+
+            <div class="info-row">
+                <i class="fa-solid fa-circle-info"></i>
+                All your sticker packs in one place. Tap a pack link to open it in Telegram, or use the buttons to manage it.
             </div>
 
             <button class="btn btn-ghost" style="margin-bottom:1rem" id="btn-refresh-packs"
@@ -1072,8 +1113,8 @@
         var el = document.getElementById(containerId);
         if (!el) return;
         el.innerHTML = '<div class="state-box">' +
-            '<span class="state-icon">📭</span>' +
-            '<p>No packs yet.<br>Create your first pack in the <strong>Create</strong> tab!</p></div>';
+            '<span class="state-icon">🔮</span>' +
+            '<p>No packs yet!<br>Create your first pack in the <strong>Create</strong> tab to get started. ✨</p></div>';
     }
 
     function populatePackSelect() {
@@ -1102,7 +1143,7 @@
             card.style.animationDelay = (idx * 55) + 'ms';
             var link = 'https://t.me/addstickers/' + encodeURIComponent(pack.name);
             card.innerHTML =
-                '<div class="pack-card-icon">📦</div>' +
+                '<div class="pack-card-icon">✨</div>' +
                 '<div class="pack-card-info">' +
                     '<div class="pack-card-title">' + escHtml(pack.title || pack.name) + '</div>' +
                     '<div class="pack-card-name">' + escHtml(pack.name) + '</div>' +
@@ -1249,6 +1290,26 @@
     // ── Boot ─────────────────────────────────────────────────────
     initUser();
     loadPacks();
+
+    // ── Magical star particles ────────────────────────────────────
+    (function () {
+        var layer = document.getElementById('star-layer');
+        if (!layer) return;
+        for (var i = 0; i < 40; i++) {
+            var s = document.createElement('div');
+            s.className = 'star-particle';
+            var size = Math.random() * 2 + 0.5;
+            s.style.cssText = [
+                'width:' + size + 'px',
+                'height:' + size + 'px',
+                'top:' + (Math.random() * 100) + '%',
+                'left:' + (Math.random() * 100) + '%',
+                '--dur:' + (Math.random() * 4 + 2) + 's',
+                '--delay:-' + (Math.random() * 5) + 's'
+            ].join(';');
+            layer.appendChild(s);
+        }
+    }());
 
 }());
 </script>
