@@ -296,13 +296,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if is_new_user(user.id):
         welcome = (
-            f"✦ <b>Welcome, {first_name}.</b>\n"
+            f"🔮 <b>Welcome, {first_name}!</b>\n"
             f"{DIV}\n\n"
-            "You've found the sticker alchemy lab.\n\n"
-            "◦ Send any image → sticker pack\n"
-            "◦ Send image + mask → clean cutout\n"
-            "◦ Videos & GIFs work too\n\n"
-            "<i>Start with ⬡ CREATE PACK below.</i>"
+            "✨ You've just entered the <b>Stix Magic</b> workshop — "
+            "where ordinary photos become Telegram stickers!\n\n"
+            "Here's all you need to know:\n\n"
+            "1️⃣ Tap <b>🟣 CREATE PACK</b> and give your pack a name\n"
+            "2️⃣ Send any photo or video — it becomes a sticker instantly!\n"
+            "3️⃣ Add more stickers, share with friends, or use <b>⚗️ Magic Cut</b> "
+            "to remove backgrounds like a wizard 🧙\n\n"
+            "<i>Not sure where to start? Tap 🟠 HELP — START HERE below!</i>"
         )
         keyboard = build_keyboard("home")
         await update.message.reply_text(welcome, reply_markup=keyboard, parse_mode="HTML")
@@ -314,10 +317,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def create_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        f"⬡ <b>CREATE PACK</b>\n"
+        f"🟣 <b>CREATE A NEW STICKER PACK</b>\n"
         f"{DIV}\n\n"
-        "What's the <b>name</b> of your new pack?\n\n"
-        "<i>This is the display title — up to 64 characters.</i>"
+        "Easy! Just tell me what you want to call it.\n\n"
+        "📝 Type the <b>display title</b> for your pack:\n"
+        "<i>(e.g. \"My Cool Stickers\" — up to 64 characters)</i>"
     )
     if update.callback_query:
         await update.callback_query.answer()
@@ -340,12 +344,14 @@ async def create_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data['newpack_title'] = title
     await update.message.reply_text(
-        f"✦ <b>{html.escape(title)}</b>\n"
+        f"✨ Great name — <b>{html.escape(title)}</b>!\n"
         f"{DIV}\n\n"
-        "Now send the <b>first sticker</b>.\n\n"
-        "◦ Any image, photo, or GIF\n"
-        "◦ Videos work as video stickers\n"
-        "◦ Or forward an existing sticker",
+        "Now send me the <b>first sticker image</b> for this pack.\n\n"
+        "📸 You can send:\n"
+        "◦ A regular photo or image file (PNG, JPG)\n"
+        "◦ A GIF or short video (becomes an animated sticker)\n"
+        "◦ An existing Telegram sticker\n\n"
+        "<i>Don't worry — you can always add more later!</i>",
         parse_mode="HTML",
         reply_markup=cancel_keyboard()
     )
@@ -407,10 +413,11 @@ async def create_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
 
         await progress.edit_text(
-            f"✦ <b>Pack created!</b>\n"
+            f"🎉 <b>Pack created!</b>\n"
             f"{DIV}\n\n"
-            f"<b>{html.escape(title)}</b>\n"
-            f"<i>Your first sticker is in.</i>",
+            f"<b>{html.escape(title)}</b> is now live on Telegram! 🚀\n\n"
+            "<i>Tap ➕ Add More Stickers to keep building,\n"
+            "or 🔗 Open Pack to see it right now.</i>",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -427,9 +434,10 @@ async def create_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
         ])
         await progress.edit_text(
-            f"⚠ <b>Something went wrong</b>\n"
+            f"⚠️ <b>Something went wrong</b>\n"
             f"{DIV}\n\n"
-            f"{friendly}",
+            f"{friendly}\n\n"
+            "<i>Tip: use a PNG or JPG image, ideally 512 × 512 px.</i>",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -455,8 +463,8 @@ async def addsticker_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = (
             f"➕ <b>ADD STICKER</b>\n"
             f"{DIV}\n\n"
-            "You don't have any packs yet.\n"
-            "Create one first!"
+            "You don't have any packs yet!\n\n"
+            "<i>Create your first pack — it only takes a few seconds. 🔮</i>"
         )
         if update.callback_query:
             await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=keyboard)
@@ -471,7 +479,7 @@ async def addsticker_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
         f"➕ <b>ADD STICKER</b>\n"
         f"{DIV}\n\n"
-        "Which pack?"
+        "👇 Which pack do you want to add to?"
     )
     if update.callback_query:
         await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard_rows))
@@ -490,8 +498,8 @@ async def addto_direct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(
         f"➕ <b>ADD STICKER</b>\n"
         f"{DIV}\n\n"
-        "Send the sticker to add.\n\n"
-        "◦ Image, video, GIF, or existing sticker",
+        "Send me the sticker image to add.\n\n"
+        "📸 Photo, image file, GIF, video, or an existing sticker",
         parse_mode="HTML",
         reply_markup=cancel_keyboard()
     )
@@ -516,8 +524,8 @@ async def addsticker_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(
         f"➕ <b>{html.escape(pack_title)}</b>\n"
         f"{DIV}\n\n"
-        "Send the sticker to add.\n\n"
-        "◦ Image, video, GIF, or existing sticker",
+        "Send me the image to add as a sticker.\n\n"
+        "📸 Photo, image file, GIF, video, or an existing sticker",
         parse_mode="HTML",
         reply_markup=cancel_keyboard()
     )
@@ -573,9 +581,10 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ])
 
         await progress.edit_text(
-            f"✦ <b>Sticker added</b>\n"
+            f"✨ <b>Sticker added!</b>\n"
             f"{DIV}\n\n"
-            f"<b>{html.escape(pack_title)}</b> is growing.",
+            f"<b>{html.escape(pack_title)}</b> is growing! 🎉\n\n"
+            "<i>Keep adding more or open the pack to share it.</i>",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -605,11 +614,12 @@ async def magic_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mode = "⬛ black = keep  ·  ⬜ white = remove" if inverted else "⬜ white = keep  ·  ⬛ black = remove"
 
     text = (
-        f"◈ <b>MAGIC CUT</b>\n"
+        f"⚗️ <b>MAGIC CUT — Step 1 of 2</b>\n"
         f"{DIV}\n\n"
-        f"<b>Step 1 of 2</b> — Send the <b>source image</b>.\n\n"
+        "This spell removes the background from your photo!\n\n"
+        "📸 First, send me the <b>photo you want to cut</b>.\n\n"
         f"<i>Mask mode: {mode}</i>\n"
-        f"<i>Change in ⚙ Settings</i>"
+        f"<i>(Change this in ⚙️ Settings → Mask Mode)</i>"
     )
     if update.callback_query:
         await update.callback_query.answer()
@@ -639,10 +649,12 @@ async def magic_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mode = "⬛ black = <b>KEEP</b>  ·  ⬜ white = remove" if inverted else "⬜ white = <b>KEEP</b>  ·  ⬛ black = remove"
 
     await update.message.reply_text(
-        f"◈ <b>MAGIC CUT</b>\n"
+        f"⚗️ <b>MAGIC CUT — Step 2 of 2</b>\n"
         f"{DIV}\n\n"
-        f"<b>Step 2 of 2</b> — Send the <b>B&W mask</b>.\n\n"
-        f"{mode}",
+        "Now send me the <b>black‑and‑white mask</b>.\n\n"
+        f"{mode}\n\n"
+        "<i>The white/black areas in your mask tell the bot\n"
+        "which parts of the photo to keep or remove.</i>",
         parse_mode="HTML",
         reply_markup=cancel_keyboard()
     )
@@ -653,7 +665,7 @@ async def magic_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_id, _, _ = extract_file_info(update.message)
     if not file_id:
         await update.message.reply_text(
-            "⚠ Send a black & white mask image.",
+            "⚠ Send a black‑and‑white mask image.",
             reply_markup=cancel_keyboard()
         )
         return WAITING_MASK_IMAGE
@@ -684,7 +696,7 @@ async def magic_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await progress.delete()
         await update.message.reply_photo(
             photo=io.BytesIO(context.user_data['cut_result']),
-            caption=f"◈ <b>Preview</b> — looks good?",
+            caption=f"✨ <b>Preview</b> — how does it look?",
             parse_mode="HTML"
         )
 
@@ -700,7 +712,7 @@ async def magic_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
 
         await update.message.reply_text(
-            "What do you want to do with it?",
+            "✨ What would you like to do with your cut‑out?",
             reply_markup=InlineKeyboardMarkup(keyboard_rows)
         )
     except Exception as e:
@@ -710,10 +722,10 @@ async def magic_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
         ])
         await progress.edit_text(
-            f"⚠ <b>Mask failed</b>\n"
+            f"⚠️ <b>Magic Cut failed</b>\n"
             f"{DIV}\n\n"
-            "Make sure both images are valid.\n"
-            "<i>The mask should be a black & white image.</i>",
+            "Please make sure both images are valid.\n"
+            "<i>The mask must be a plain black‑and‑white image (no colors).</i>",
             parse_mode="HTML",
             reply_markup=keyboard
         )
@@ -801,24 +813,29 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        f"▸ <b>HOW IT WORKS</b>\n"
+        f"📖 <b>HOW IT WORKS</b>\n"
         f"{DIV}\n\n"
-        "<b>⬡ CREATE PACK</b>\n"
-        "  Name your pack → send an image\n"
-        "  → pack is live on Telegram\n\n"
-        "<b>➕ ADD STICKER</b>\n"
-        "  Pick a pack → send more images\n\n"
-        "<b>◈ MAGIC CUT</b>\n"
-        "  Send a photo + a black & white mask\n"
-        "  → get a clean transparent cutout\n\n"
-        "<b>⚙ SETTINGS</b>\n"
-        "  Flip mask mode (white/black = keep)\n"
+        "<b>🟣 CREATE A STICKER PACK</b>\n"
+        "  1. Tap Create Pack and type a title\n"
+        "  2. Send any photo or video\n"
+        "  3. Your pack is live on Telegram! 🎉\n\n"
+        "<b>➕ ADD MORE STICKERS</b>\n"
+        "  Tap Add Sticker, pick your pack,\n"
+        "  then send the image to add.\n\n"
+        "<b>⚗️ MAGIC CUT</b>\n"
+        "  1. Send your <b>subject photo</b>\n"
+        "  2. Send a <b>black‑and‑white mask</b>\n"
+        "     (white = keep, black = remove)\n"
+        "  3. Get a clean transparent cut‑out!\n\n"
+        "<b>⚙️ SETTINGS</b>\n"
+        "  Flip mask colors if your cut‑outs\n"
+        "  look inverted.\n"
     )
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("△ Tips & Tricks", callback_data="nav:tips")],
+        [InlineKeyboardButton("💡 Quick Tips", callback_data="nav:tips")],
         [InlineKeyboardButton("◂ Back", callback_data="nav:help"),
-         InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+         InlineKeyboardButton("🔮 Home", callback_data="nav:home")],
     ])
 
     if update.callback_query:
@@ -830,17 +847,18 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        f"✦ <b>STIX MAGIC</b>\n"
+        f"🔮 <b>STIX MAGIC</b>\n"
         f"{DIV}\n\n"
-        "Sticker alchemy lab.\n\n"
-        "Transform any image into a Telegram sticker.\n"
-        "Cut, create, collect.\n\n"
+        "✨ Your personal sticker alchemy workshop.\n\n"
+        "Transform any photo, video, or GIF into a\n"
+        "Telegram sticker in seconds — no apps, no\n"
+        "editing skills needed. Pure magic. 🧙\n\n"
         "<i>stixmagic.com</i>"
     )
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🌐 stixmagic.com", url="https://stixmagic.com")],
-        [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+        [InlineKeyboardButton("🔮 Home", callback_data="nav:home")],
     ])
 
     if update.callback_query:
@@ -981,11 +999,14 @@ async def settings_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     toggle_label = "Switch to ⬜ White = keep" if inverted else "Switch to ⬛ Black = keep"
 
     text = (
-        f"◐ <b>MASK MODE</b>\n"
+        f"⚙️ <b>MASK MODE</b>\n"
         f"{DIV}\n\n"
-        f"Current: <b>{current}</b>\n\n"
-        "<i>This controls which color in your mask\n"
-        "gets kept when cutting a sticker.</i>"
+        f"Current setting: <b>{current}</b>\n\n"
+        "This controls which color in your mask image\n"
+        "gets <b>kept</b> when using ⚗️ Magic Cut.\n\n"
+        "◦ <b>White = keep</b> — paint white over the subject\n"
+        "◦ <b>Black = keep</b> — paint black over the subject\n\n"
+        "<i>If your cut‑outs look inside‑out, tap the button below to flip it.</i>"
     )
 
     keyboard = InlineKeyboardMarkup([

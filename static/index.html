@@ -4,153 +4,272 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stix Magic — Sticker Alchemy</title>
-    <meta name="description" content="Sticker alchemy lab. Transform images into magical stickers on Telegram.">
+    <meta name="description" content="Sticker alchemy workshop. Transform images into magical Telegram stickers.">
     <meta property="og:title" content="Stix Magic — Sticker Alchemy">
     <meta property="og:description" content="Transform images into magical stickers on Telegram.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://stixmagic.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:        #0d0a1a;
+            --bg2:       #150f28;
+            --gold:      #d4a843;
+            --gold-dim:  #8a6820;
+            --purple:    #9b5de5;
+            --purple-dim:#5e2faa;
+            --teal:      #4ecdc4;
+            --text:      #e8dff8;
+            --muted:     #6b5f8a;
+            --border:    rgba(155, 93, 229, 0.18);
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; transform: scale(0.8); }
+            50%       { opacity: 1;   transform: scale(1.1); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50%       { transform: translateY(-8px); }
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% { text-shadow: 0 0 12px rgba(212, 168, 67, 0.4); }
+            50%       { text-shadow: 0 0 28px rgba(212, 168, 67, 0.9), 0 0 60px rgba(155, 93, 229, 0.4); }
+        }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #09090b;
-            color: #d4d4d8;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            overflow-x: hidden;
+        }
+
+        /* Starfield */
+        .stars {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+            animation: twinkle var(--dur, 3s) ease-in-out infinite;
+            animation-delay: var(--delay, 0s);
         }
 
         .container {
-            max-width: 460px;
+            position: relative;
+            z-index: 1;
+            max-width: 480px;
             width: 100%;
             padding: 2.5rem 1.5rem;
             text-align: center;
         }
 
-        .mark {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            letter-spacing: 0.05em;
+        /* Glowing orb behind the symbol */
+        .orb {
+            width: 90px;
+            height: 90px;
+            margin: 0 auto 0.8rem;
+            background: radial-gradient(circle at 38% 38%, var(--purple) 0%, #3a1a6e 60%, transparent 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.6rem;
+            animation: float 4s ease-in-out infinite;
+            box-shadow: 0 0 30px rgba(155, 93, 229, 0.5), 0 0 70px rgba(155, 93, 229, 0.2);
         }
 
         h1 {
-            font-size: 2.2rem;
+            font-family: 'Cinzel', serif;
+            font-size: 2.4rem;
             font-weight: 700;
-            letter-spacing: 0.04em;
-            color: #fafafa;
-            margin-bottom: 0.3rem;
+            color: var(--gold);
+            letter-spacing: 0.1em;
+            margin-bottom: 0.2rem;
+            animation: glow-pulse 3s ease-in-out infinite;
         }
 
         .tagline {
-            font-size: 0.95rem;
-            color: #71717a;
-            letter-spacing: 0.08em;
+            font-size: 0.88rem;
+            color: var(--purple);
+            letter-spacing: 0.2em;
             text-transform: uppercase;
-            margin-bottom: 2.5rem;
+            margin-bottom: 2rem;
         }
 
+        /* Decorative divider */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            color: var(--gold-dim);
+            font-size: 0.9rem;
+        }
+
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+        }
+
+        /* Feature cards */
         .features {
             text-align: left;
-            margin-bottom: 2.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
         }
 
         .feature {
             display: flex;
             align-items: flex-start;
-            gap: 0.75rem;
-            padding: 0.85rem 0;
-            border-bottom: 1px solid #18181b;
+            gap: 0.85rem;
+            padding: 0.9rem 1rem;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
-        .feature:last-child { border-bottom: none; }
+        .feature:hover {
+            border-color: rgba(155, 93, 229, 0.4);
+            box-shadow: 0 0 16px rgba(155, 93, 229, 0.1);
+        }
 
         .feature-icon {
-            font-size: 1.3rem;
+            font-size: 1.5rem;
             flex-shrink: 0;
-            width: 1.8rem;
+            width: 2rem;
             text-align: center;
-            opacity: 0.85;
         }
 
         .feature-text h3 {
             font-size: 0.9rem;
             font-weight: 600;
-            color: #e4e4e7;
-            margin-bottom: 0.1rem;
+            color: var(--gold);
+            margin-bottom: 0.15rem;
         }
 
         .feature-text p {
             font-size: 0.8rem;
-            color: #52525b;
-            line-height: 1.4;
+            color: var(--muted);
+            line-height: 1.5;
         }
 
+        /* CTA button */
         .cta {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            background: #fafafa;
-            color: #09090b;
+            justify-content: center;
+            gap: 0.6rem;
+            background: linear-gradient(135deg, var(--purple-dim), var(--purple));
+            color: #fff;
             text-decoration: none;
             font-size: 1rem;
             font-weight: 600;
-            padding: 0.85rem 2rem;
-            border-radius: 10px;
-            transition: opacity 0.2s;
+            padding: 0.9rem 2rem;
+            border-radius: 12px;
             width: 100%;
-            justify-content: center;
-            letter-spacing: 0.02em;
+            letter-spacing: 0.04em;
+            transition: opacity 0.2s, box-shadow 0.2s, transform 0.15s;
+            box-shadow: 0 4px 20px rgba(155, 93, 229, 0.4);
         }
 
-        .cta:hover { opacity: 0.88; }
+        .cta:hover {
+            opacity: 0.92;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(155, 93, 229, 0.6);
+        }
 
         .footer {
-            margin-top: 3rem;
-            font-size: 0.7rem;
-            color: #27272a;
-            letter-spacing: 0.1em;
+            margin-top: 2.5rem;
+            font-size: 0.68rem;
+            color: var(--muted);
+            letter-spacing: 0.15em;
             text-transform: uppercase;
         }
     </style>
 </head>
 <body>
+    <!-- Starfield -->
+    <div class="stars" id="stars"></div>
+
     <div class="container">
-        <div class="mark">✦</div>
+        <div class="orb">🔮</div>
         <h1>STIX MAGIC</h1>
-        <p class="tagline">Sticker Alchemy</p>
+        <p class="tagline">✦ Sticker Alchemy Workshop ✦</p>
+
+        <div class="divider">⚗️</div>
 
         <div class="features">
             <div class="feature">
-                <div class="feature-icon">✦</div>
+                <div class="feature-icon">🟣</div>
                 <div class="feature-text">
-                    <h3>Create</h3>
-                    <p>Name a pack, send an image. Your sticker pack is live.</p>
+                    <h3>Create a Pack</h3>
+                    <p>Give your pack a name, send any photo or video — and it's live on Telegram instantly.</p>
                 </div>
             </div>
             <div class="feature">
-                <div class="feature-icon">✦</div>
+                <div class="feature-icon">⚗️</div>
                 <div class="feature-text">
-                    <h3>Transform</h3>
-                    <p>Send an image and a mask. Get a clean cutout sticker.</p>
+                    <h3>Magic Cut</h3>
+                    <p>Send a photo + a black‑and‑white mask. The wizard cuts out the subject, no background needed.</p>
                 </div>
             </div>
             <div class="feature">
-                <div class="feature-icon">✦</div>
+                <div class="feature-icon">📦</div>
                 <div class="feature-text">
-                    <h3>Collect</h3>
-                    <p>Organize your stickers into packs. Add, manage, share.</p>
+                    <h3>Collect &amp; Share</h3>
+                    <p>All your packs in one place. Add stickers, share links, or delete anytime.</p>
                 </div>
             </div>
         </div>
 
         <a href="https://t.me/stixmagicbot" class="cta">
-            Open in Telegram
+            ✨ Open in Telegram
         </a>
 
         <p class="footer">stixmagic.com</p>
     </div>
+
+    <script>
+    (function () {
+        var starCount = 60;
+        var container = document.getElementById('stars');
+        for (var i = 0; i < starCount; i++) {
+            var s = document.createElement('div');
+            s.className = 'star';
+            var size = Math.random() * 2.5 + 0.5;
+            s.style.cssText = [
+                'width:' + size + 'px',
+                'height:' + size + 'px',
+                'top:' + (Math.random() * 100) + '%',
+                'left:' + (Math.random() * 100) + '%',
+                '--dur:' + (Math.random() * 4 + 2) + 's',
+                '--delay:' + (Math.random() * 5) + 's'
+            ].join(';');
+            container.appendChild(s);
+        }
+    }());
+    </script>
 </body>
 </html>
