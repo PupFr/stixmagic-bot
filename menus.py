@@ -1,7 +1,17 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
+import os
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 DIVIDER = "─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─"
+
+def _resolve_miniapp_url():
+    url = os.environ.get("MINIAPP_URL", "")
+    if not url:
+        domains = os.environ.get("REPLIT_DOMAINS", "")
+        if domains:
+            url = f"https://{domains.split(',')[0]}/miniapp"
+    return url
+
+MINIAPP_URL = _resolve_miniapp_url()
 
 MENU_STRUCTURE = {
 
@@ -25,6 +35,9 @@ MENU_STRUCTURE = {
             [
                 {"label": "🟠 HELP", "nav": "help"},
                 {"label": "🟠 ABOUT", "action": "menu_about"},
+            ],
+            [
+                {"label": "🖥 OPEN MINI APP", "web_app": True},
             ],
         ],
         "parent": None,
@@ -111,6 +124,8 @@ def build_keyboard(menu_id):
                 row.append(InlineKeyboardButton(btn["label"], callback_data=btn["action"]))
             elif "url" in btn:
                 row.append(InlineKeyboardButton(btn["label"], url=btn["url"]))
+            elif "web_app" in btn and MINIAPP_URL:
+                row.append(InlineKeyboardButton(btn["label"], web_app=WebAppInfo(url=MINIAPP_URL)))
         if row:
             rows.append(row)
 
