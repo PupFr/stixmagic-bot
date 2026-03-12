@@ -9,7 +9,7 @@ import threading
 import subprocess
 import tempfile
 from PIL import Image, ImageOps
-from telegram import Update, InputSticker, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InputSticker, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, MenuButtonWebApp
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ConversationHandler, ContextTypes, CallbackQueryHandler
@@ -1043,7 +1043,19 @@ def main():
 
     token = token_match.group(0)
 
-    application = Application.builder().token(token).build()
+    from menus import MINIAPP_URL
+
+    async def post_init(app):
+        if MINIAPP_URL:
+            try:
+                await app.bot.set_chat_menu_button(
+                    menu_button=MenuButtonWebApp(text="✦ Mini App", web_app=WebAppInfo(url=MINIAPP_URL))
+                )
+                logger.info(f"Menu button set to Mini App: {MINIAPP_URL}")
+            except Exception as e:
+                logger.warning(f"Could not set menu button: {e}")
+
+    application = Application.builder().token(token).post_init(post_init).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("packs", show_packs))
