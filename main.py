@@ -1,20 +1,38 @@
-import os
-import re
 import html
-import sqlite3
-import logging
 import io
-import string
+import logging
+import os
 import random
+import re
+import string
 import threading
-import subprocess
-import tempfile
-from PIL import Image, ImageOps
-from telegram import Update, InputSticker, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, MenuButtonWebApp
+
+from telegram import (
+    InputSticker, InlineKeyboardButton, InlineKeyboardMarkup,
+    MenuButtonWebApp, Update, WebAppInfo,
+)
 from telegram.error import BadRequest
 from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    ConversationHandler, ContextTypes, CallbackQueryHandler
+    Application, CallbackQueryHandler, CommandHandler, ContextTypes,
+    ConversationHandler, MessageHandler, filters,
+)
+
+from infra.db import (
+    add_pack as add_pack_to_db,
+    delete_pack as delete_pack_from_db,
+    get_mask_inverted,
+    get_user_packs,
+    init_db,
+    is_new_user,
+    set_mask_inverted,
+    update_pack_title as update_pack_title_in_db,
+)
+from domain.media import (
+    apply_mask_to_image,
+    convert_to_sticker,
+    convert_video_to_sticker,
+    download_file_bytes,
+    extract_file_info,
 )
 from menus import build_keyboard, get_menu_text
 
@@ -23,78 +41,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DB_FILE = "bot.db"
-
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS packs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            name TEXT,
-            title TEXT
-        )
-    ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS user_settings (
-            user_id INTEGER PRIMARY KEY,
-            mask_inverted INTEGER DEFAULT 0
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
 init_db()
-
-
-def get_mask_inverted(user_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('SELECT mask_inverted FROM user_settings WHERE user_id = ?', (user_id,))
-    row = c.fetchone()
-    conn.close()
-    return bool(row[0]) if row else False
-
-def set_mask_inverted(user_id, inverted):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute(
-        'INSERT INTO user_settings (user_id, mask_inverted) VALUES (?, ?) '
-        'ON CONFLICT(user_id) DO UPDATE SET mask_inverted = ?',
-        (user_id, int(inverted), int(inverted))
-    )
-    conn.commit()
-    conn.close()
-
-def add_pack_to_db(user_id, name, title):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('INSERT INTO packs (user_id, name, title) VALUES (?, ?, ?)', (user_id, name, title))
-    conn.commit()
-    conn.close()
-
-def delete_pack_from_db(user_id, name):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('DELETE FROM packs WHERE user_id = ? AND name = ?', (user_id, name))
-    conn.commit()
-    conn.close()
-
-def get_user_packs(user_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('SELECT name, title FROM packs WHERE user_id = ?', (user_id,))
-    rows = c.fetchall()
-    conn.close()
-    return rows
-
-def update_pack_title_in_db(user_id, name, title):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('UPDATE packs SET title = ? WHERE user_id = ? AND name = ?', (title, user_id, name))
-    conn.commit()
-    conn.close()
 
 async def validate_and_sync_packs(bot, user_id):
     """Check each DB pack against Telegram. Prune deleted packs, sync renamed titles."""
@@ -110,16 +57,6 @@ async def validate_and_sync_packs(bot, user_id):
             delete_pack_from_db(user_id, name)
             logger.info(f"Pruned stale pack {name} for user {user_id}")
     return valid
-
-def is_new_user(user_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('SELECT COUNT(*) FROM packs WHERE user_id = ?', (user_id,))
-    packs = c.fetchone()[0]
-    c.execute('SELECT COUNT(*) FROM user_settings WHERE user_id = ?', (user_id,))
-    settings = c.fetchone()[0]
-    conn.close()
-    return packs == 0 and settings == 0
 
 
 WAITING_TITLE, WAITING_STICKER = range(2)
@@ -142,155 +79,6 @@ def back_home_keyboard(back):
         InlineKeyboardButton("◂ Back", callback_data=f"nav:{back}"),
         InlineKeyboardButton("✦ Home", callback_data="nav:home"),
     ]])
-
-
-def extract_file_info(message):
-    if message.sticker:
-        fmt = "video" if message.sticker.is_video else "static"
-        return message.sticker.file_id, "sticker", fmt
-    elif message.photo:
-        return message.photo[-1].file_id, "image", "static"
-    elif message.document:
-        mime = message.document.mime_type or ""
-        if mime.startswith("image/"):
-            return message.document.file_id, "image", "static"
-        elif mime.startswith("video/") or mime == "image/gif":
-            return message.document.file_id, "video", "video"
-        return message.document.file_id, "image", "static"
-    elif message.video:
-        return message.video.file_id, "video", "video"
-    elif message.animation:
-        return message.animation.file_id, "video", "video"
-    elif message.video_note:
-        return message.video_note.file_id, "video", "video"
-    return None, None, None
-
-async def download_file_bytes(bot, file_id):
-    try:
-        file = await bot.get_file(file_id)
-        buf = io.BytesIO()
-        await file.download_to_memory(buf)
-        buf.seek(0)
-        return buf
-    except Exception as e:
-        logger.error(f"Error downloading file: {e}")
-        return None
-
-
-def convert_video_to_sticker(file_bytes):
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_in:
-            tmp_in.write(file_bytes.getvalue())
-            tmp_in_path = tmp_in.name
-
-        tmp_out_path = tmp_in_path.replace(".mp4", "_out.webm")
-
-        def run_ffmpeg(bitrate, out_path):
-            cmd = [
-                "ffmpeg", "-y", "-i", tmp_in_path,
-                "-vf", "scale='if(gt(iw,ih),512,-2)':'if(gt(iw,ih),-2,512)',fps=30",
-                "-c:v", "libvpx-vp9",
-                "-b:v", bitrate,
-                "-t", "3",
-                "-an",
-                "-pix_fmt", "yuva420p",
-                out_path
-            ]
-            return subprocess.run(cmd, capture_output=True, timeout=30)
-
-        result = run_ffmpeg("200k", tmp_out_path)
-
-        if result.returncode != 0:
-            logger.error(f"ffmpeg error: {result.stderr.decode()[:500]}")
-            return None
-
-        with open(tmp_out_path, "rb") as f:
-            data = f.read()
-
-        if len(data) > 256000:
-            os.unlink(tmp_out_path)
-            tmp_out_path2 = tmp_in_path.replace(".mp4", "_out2.webm")
-            run_ffmpeg("100k", tmp_out_path2)
-            if os.path.exists(tmp_out_path2):
-                with open(tmp_out_path2, "rb") as f:
-                    data = f.read()
-                os.unlink(tmp_out_path2)
-            tmp_out_path = tmp_out_path2
-
-        os.unlink(tmp_in_path)
-        if os.path.exists(tmp_out_path):
-            os.unlink(tmp_out_path)
-
-        return io.BytesIO(data)
-    except Exception as e:
-        logger.error(f"Video conversion error: {e}")
-        return None
-
-
-def convert_to_sticker(file_bytes):
-    try:
-        img = Image.open(file_bytes)
-    except Exception:
-        return None
-
-    if img.mode != "RGBA":
-        img = img.convert("RGBA")
-
-    max_dim = 512
-    w, h = img.size
-    if w > h:
-        new_w = max_dim
-        new_h = int(h * max_dim / w)
-    else:
-        new_h = max_dim
-        new_w = int(w * max_dim / h)
-
-    if (new_w, new_h) != (w, h):
-        img = img.resize((new_w, new_h), Image.LANCZOS)
-
-    output = io.BytesIO()
-    img.save(output, format="WEBP", quality=80)
-    if output.tell() > 64000:
-        for q in [60, 40, 20]:
-            output = io.BytesIO()
-            img.save(output, format="WEBP", quality=q)
-            if output.tell() <= 64000:
-                break
-    output.seek(0)
-    return output
-
-
-def apply_mask_to_image(source_bytes, mask_bytes, inverted=False):
-    source = Image.open(source_bytes).convert("RGBA")
-    mask = Image.open(mask_bytes).convert("L")
-    mask = mask.resize(source.size, Image.LANCZOS)
-
-    if inverted:
-        mask = ImageOps.invert(mask)
-
-    result = source.copy()
-    result.putalpha(mask)
-
-    max_dim = 512
-    w, h = result.size
-    if w > h:
-        new_w = max_dim
-        new_h = int(h * max_dim / w)
-    else:
-        new_h = max_dim
-        new_w = int(w * max_dim / h)
-    result = result.resize((new_w, new_h), Image.LANCZOS)
-
-    output = io.BytesIO()
-    result.save(output, format="WEBP", quality=80)
-    if output.tell() > 64000:
-        for q in [60, 40, 20]:
-            output = io.BytesIO()
-            result.save(output, format="WEBP", quality=q)
-            if output.tell() <= 64000:
-                break
-    output.seek(0)
-    return output
 
 
 async def send_menu(update, menu_id):
