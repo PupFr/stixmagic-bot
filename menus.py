@@ -29,18 +29,63 @@ MENU_STRUCTURE = {
                 {"label": "◈ RITUAL CUT", "action": "menu_magic"},
             ],
             [
+                {"label": "🗂 DRAFT VAULT ▸", "nav": "draft_vault"},
+                {"label": "🎨 CATALOG ▸", "nav": "catalog"},
+            ],
+            [
                 {"label": "📖 GRIMOIRE ▸", "nav": "my_packs"},
                 {"label": "⚙ ORACLE ▸", "nav": "settings"},
             ],
             [
-                {"label": "📜 CODEX", "nav": "help"},
+                {"label": "💎 PLANS", "action": "menu_plans"},
                 {"label": "✦ LORE", "action": "menu_about"},
             ],
             [
+                {"label": "📜 CODEX", "nav": "help"},
                 {"label": "🔮 OPEN THE PORTAL", "web_app": True},
             ],
         ],
         "parent": None,
+    },
+
+    "draft_vault": {
+        "header": "🗂 <b>DRAFT VAULT</b>",
+        "body": (
+            "<i>all generated stickers await your judgement here</i>\n\n"
+            "Generated → Draft → Approved → Published\n"
+            "Generated → Draft → Rejected → Trash\n\n"
+            "◦ Review your pending drafts\n"
+            "◦ Approve stickers to publish them\n"
+            "◦ Reject to send to trash\n"
+        ),
+        "buttons": [
+            [
+                {"label": "🗂 MY DRAFTS", "action": "menu_mydrafts"},
+                {"label": "✅ APPROVED", "action": "menu_myapproved"},
+            ],
+            [
+                {"label": "🗑 TRASH", "action": "menu_trash"},
+            ],
+        ],
+        "parent": "home",
+    },
+
+    "catalog": {
+        "header": "🎨 <b>STYLE CATALOG</b>",
+        "body": (
+            "<i>choose your sticker style</i>\n\n"
+            "Browse available styles for sticker generation.\n\n"
+            "🆓 Free styles — available on all plans\n"
+            "⭐ Premium styles — Premium & Pro plans\n"
+            "💎 Pro styles — Pro plan only\n"
+        ),
+        "buttons": [
+            [
+                {"label": "🎨 BROWSE STYLES", "action": "menu_catalog"},
+                {"label": "💎 VIEW PLANS", "action": "menu_plans"},
+            ],
+        ],
+        "parent": "home",
     },
 
     "my_packs": {

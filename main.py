@@ -9,6 +9,8 @@ import random
 import threading
 import subprocess
 import tempfile
+import time
+from datetime import datetime, timedelta, timezone
 from PIL import Image, ImageOps
 from telegram import Update, InputSticker, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, MenuButtonWebApp
 from telegram.error import BadRequest
@@ -28,6 +30,8 @@ DB_FILE = "bot.db"
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
+
+    # ── Existing tables ──────────────────────────────────────────
     c.execute('''
         CREATE TABLE IF NOT EXISTS packs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,6 +46,97 @@ def init_db():
             mask_inverted INTEGER DEFAULT 0
         )
     ''')
+
+    # ── User registry ─────────────────────────────────────────────
+    # Tracks every Telegram user who interacts with the bot along with
+    # their subscription plan (free / premium / pro).
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_id INTEGER UNIQUE NOT NULL,
+            username   TEXT,
+            plan       TEXT NOT NULL DEFAULT 'free',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    ''')
+
+    # ── Creation-limit tracking ───────────────────────────────────
+    # Records how many stickers a user has generated within a billing
+    # period (daily for free plan, monthly for premium/pro).
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS user_usage (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id        INTEGER NOT NULL REFERENCES users(id),
+            period_type    TEXT NOT NULL,
+            period_start   TEXT NOT NULL,
+            period_end     TEXT NOT NULL,
+            creations_used INTEGER NOT NULL DEFAULT 0,
+            created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    ''')
+
+    # ── Draft vault ───────────────────────────────────────────────
+    # Every generated sticker lives here first.  It must be explicitly
+    # approved before it can be published to a pack or collection.
+    # Pipeline: generated → draft → approved → published
+    #           generated → draft → rejected  → trash
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS sticker_drafts (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id           INTEGER NOT NULL REFERENCES users(id),
+            source_file_id    TEXT,
+            generated_file_id TEXT,
+            status            TEXT NOT NULL DEFAULT 'draft',
+            style_id          INTEGER REFERENCES catalog_styles(id),
+            created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+            expires_at        TEXT
+        )
+    ''')
+
+    # ── Sticker collections ───────────────────────────────────────
+    # Named groups that hold approved stickers (analogous to albums).
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS sticker_collections (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL REFERENCES users(id),
+            name       TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    ''')
+
+    # ── Collection items ──────────────────────────────────────────
+    # Links an approved draft to a collection and stores the Telegram
+    # file_id for fast retrieval.
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS collection_items (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            collection_id    INTEGER NOT NULL REFERENCES sticker_collections(id),
+            draft_id         INTEGER NOT NULL REFERENCES sticker_drafts(id),
+            telegram_file_id TEXT,
+            created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    ''')
+
+    # ── Style catalog ─────────────────────────────────────────────
+    # Defines the visual styles available during sticker creation.
+    # plan_access controls which plan tier can access each style.
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS catalog_styles (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            name          TEXT NOT NULL,
+            slug          TEXT NOT NULL UNIQUE,
+            description   TEXT,
+            preview_image TEXT,
+            category      TEXT,
+            plan_access   TEXT NOT NULL DEFAULT 'free',
+            status        TEXT NOT NULL DEFAULT 'active',
+            instructions  TEXT,
+            created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
@@ -120,6 +215,214 @@ def is_new_user(user_id):
     settings = c.fetchone()[0]
     conn.close()
     return packs == 0 and settings == 0
+
+
+# ── Plan limits ───────────────────────────────────────────────
+# Defines creation quotas and draft caps per subscription tier.
+PLAN_LIMITS = {
+    'free':    {'period': 'daily',   'creations': 3,   'max_drafts': 10},
+    'premium': {'period': 'monthly', 'creations': 50,  'max_drafts': 100},
+    'pro':     {'period': 'monthly', 'creations': 300, 'max_drafts': None},
+}
+
+# Drafts older than this many days are automatically expired by the cleanup worker.
+# Configurable here; future versions may vary this per plan.
+DRAFT_EXPIRY_DAYS = 7
+
+
+def _utcnow() -> datetime:
+    """Return the current UTC time as a timezone-naive datetime.
+
+    Uses datetime.now(timezone.utc) (Python 3.12-compatible) and strips
+    the tzinfo so it stays compatible with SQLite's datetime() strings.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+# ── User-registry helpers ─────────────────────────────────────
+
+def get_or_create_user(telegram_id, username=None):
+    """Return the internal users row, creating it on first contact."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('SELECT id, plan FROM users WHERE telegram_id = ?', (telegram_id,))
+    row = c.fetchone()
+    if row:
+        if username:
+            c.execute(
+                "UPDATE users SET username = ?, updated_at = datetime('now') WHERE telegram_id = ?",
+                (username, telegram_id)
+            )
+            conn.commit()
+        conn.close()
+        return {'id': row[0], 'plan': row[1]}
+    c.execute(
+        "INSERT INTO users (telegram_id, username) VALUES (?, ?)",
+        (telegram_id, username)
+    )
+    conn.commit()
+    user_id = c.lastrowid
+    conn.close()
+    return {'id': user_id, 'plan': 'free'}
+
+
+def get_user_plan(telegram_id):
+    """Return the plan string for a Telegram user ('free', 'premium', 'pro')."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('SELECT plan FROM users WHERE telegram_id = ?', (telegram_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else 'free'
+
+
+# ── Usage-tracking helpers ────────────────────────────────────
+
+def _current_period_bounds(period_type):
+    """Return (period_start, period_end) ISO strings for the current billing window."""
+    now = _utcnow()
+    if period_type == 'daily':
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+    else:  # monthly
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if start.month == 12:
+            end = start.replace(year=start.year + 1, month=1)
+        else:
+            end = start.replace(month=start.month + 1)
+    return start.isoformat(), end.isoformat()
+
+
+def check_creation_limit(telegram_id):
+    """Return (allowed: bool, remaining: int) for the user's current period."""
+    plan = get_user_plan(telegram_id)
+    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS['free'])
+    period_type = limits['period']
+    max_creations = limits['creations']
+    period_start, period_end = _current_period_bounds(period_type)
+
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute(
+        "SELECT creations_used FROM user_usage "
+        "WHERE user_id = (SELECT id FROM users WHERE telegram_id = ?) "
+        "AND period_type = ? AND period_start = ?",
+        (telegram_id, period_type, period_start)
+    )
+    row = c.fetchone()
+    conn.close()
+    used = row[0] if row else 0
+    remaining = max(0, max_creations - used)
+    return remaining > 0, remaining
+
+
+def increment_usage(telegram_id):
+    """Increment the creation counter for the user's current billing period."""
+    plan = get_user_plan(telegram_id)
+    period_type = PLAN_LIMITS.get(plan, PLAN_LIMITS['free'])['period']
+    period_start, period_end = _current_period_bounds(period_type)
+
+    user = get_or_create_user(telegram_id)
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute(
+        "SELECT id FROM user_usage WHERE user_id = ? AND period_type = ? AND period_start = ?",
+        (user['id'], period_type, period_start)
+    )
+    row = c.fetchone()
+    if row:
+        c.execute(
+            "UPDATE user_usage SET creations_used = creations_used + 1 WHERE id = ?",
+            (row[0],)
+        )
+    else:
+        c.execute(
+            "INSERT INTO user_usage (user_id, period_type, period_start, period_end, creations_used) "
+            "VALUES (?, ?, ?, ?, 1)",
+            (user['id'], period_type, period_start, period_end)
+        )
+    conn.commit()
+    conn.close()
+
+
+# ── Draft-vault helpers ───────────────────────────────────────
+
+def create_draft(telegram_id, source_file_id=None, generated_file_id=None, style_id=None):
+    """Insert a new draft and return its row id."""
+    user = get_or_create_user(telegram_id)
+    expires_at = (_utcnow() + timedelta(days=DRAFT_EXPIRY_DAYS)).isoformat()
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO sticker_drafts "
+        "(user_id, source_file_id, generated_file_id, style_id, expires_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (user['id'], source_file_id, generated_file_id, style_id, expires_at)
+    )
+    conn.commit()
+    draft_id = c.lastrowid
+    conn.close()
+    return draft_id
+
+
+def get_user_drafts(telegram_id, status=None):
+    """Return draft rows for a user, optionally filtered by status."""
+    user = get_or_create_user(telegram_id)
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    if status:
+        c.execute(
+            "SELECT id, generated_file_id, status, created_at, expires_at "
+            "FROM sticker_drafts WHERE user_id = ? AND status = ? ORDER BY created_at DESC",
+            (user['id'], status)
+        )
+    else:
+        c.execute(
+            "SELECT id, generated_file_id, status, created_at, expires_at "
+            "FROM sticker_drafts WHERE user_id = ? ORDER BY created_at DESC",
+            (user['id'],)
+        )
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+
+def update_draft_status(draft_id, status):
+    """Change the lifecycle status of a draft."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute(
+        "UPDATE sticker_drafts SET status = ?, updated_at = datetime('now') WHERE id = ?",
+        (status, draft_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+# ── Cleanup worker ────────────────────────────────────────────
+
+def cleanup_worker():
+    """Background thread: expire drafts that have passed their expiry date.
+
+    Runs once per day. Moves stale 'draft' rows to 'expired' so the
+    draft vault stays clean without manual intervention.
+    """
+    while True:
+        try:
+            with sqlite3.connect(DB_FILE) as conn:
+                c = conn.cursor()
+                c.execute(
+                    "UPDATE sticker_drafts "
+                    "SET status = 'expired', updated_at = datetime('now') "
+                    "WHERE status = 'draft' AND expires_at < datetime('now')"
+                )
+                expired_count = c.rowcount
+                conn.commit()
+            if expired_count:
+                logger.info(f"Cleanup: expired {expired_count} draft(s)")
+        except Exception as e:
+            logger.error(f"Cleanup worker error: {e}")
+        time.sleep(86400)  # run once per day
 
 
 WAITING_TITLE, WAITING_STICKER = range(2)
@@ -1107,6 +1410,261 @@ async def _sync_process(update: Update, context: ContextTypes.DEFAULT_TYPE, pack
     return ConversationHandler.END
 
 
+# ── ANIMATED TASK FEEDBACK ────────────────────────────────────
+
+async def send_working_animation(update: Update):
+    """Send a 'working…' placeholder while the bot processes a request.
+
+    Returns the sent Message so the caller can delete it when done.
+    The placeholder keeps the chat informative without permanent clutter.
+    """
+    return await update.effective_message.reply_text(
+        "🧙 <i>working on it…</i>",
+        parse_mode="HTML"
+    )
+
+
+async def delete_working_animation(bot, chat_id: int, message_id: int):
+    """Delete the working-animation placeholder sent by send_working_animation."""
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception:
+        pass  # already deleted or not found — safe to ignore
+
+
+# ── DRAFT VAULT COMMANDS ──────────────────────────────────────
+
+async def mydrafts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show the user's pending draft stickers.
+
+    Drafts are generated stickers awaiting review.  From here the user
+    can approve, retry, or reject each one.
+    """
+    user = update.effective_user
+    drafts = get_user_drafts(user.id, status='draft')
+
+    if not drafts:
+        text = (
+            f"🗂 <b>DRAFT VAULT</b>\n{DIV}\n\n"
+            "No pending drafts — the vault is empty.\n\n"
+            "<i>Generate a sticker to see it here first.</i>"
+        )
+        await update.message.reply_text(
+            text, parse_mode="HTML", reply_markup=home_keyboard()
+        )
+        return
+
+    text = (
+        f"🗂 <b>DRAFT VAULT</b>\n{DIV}\n\n"
+        f"You have <b>{len(drafts)}</b> pending draft(s).\n\n"
+        "<i>Use the buttons below to approve, retry, or reject each draft.</i>"
+    )
+    keyboard_rows = []
+    for draft_id, file_id, status, created_at, expires_at in drafts:
+        label = f"Draft #{draft_id}"
+        keyboard_rows.append([
+            InlineKeyboardButton(f"✓ Approve #{draft_id}", callback_data=f"draft_approve_{draft_id}"),
+            InlineKeyboardButton(f"✕ Reject", callback_data=f"draft_reject_{draft_id}"),
+        ])
+        keyboard_rows.append([
+            InlineKeyboardButton(f"🔄 Retry #{draft_id}", callback_data=f"draft_retry_{draft_id}"),
+            InlineKeyboardButton(f"💾 Save later", callback_data=f"draft_save_{draft_id}"),
+        ])
+    keyboard_rows.append([InlineKeyboardButton("✦ Home", callback_data="nav:home")])
+
+    await update.message.reply_text(
+        text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard_rows)
+    )
+
+
+async def myapproved_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show the user's approved stickers ready for publishing."""
+    user = update.effective_user
+    approved = get_user_drafts(user.id, status='approved')
+
+    if not approved:
+        text = (
+            f"✅ <b>APPROVED STICKERS</b>\n{DIV}\n\n"
+            "No approved stickers yet.\n\n"
+            "<i>Approve drafts from /mydrafts to see them here.</i>"
+        )
+    else:
+        text = (
+            f"✅ <b>APPROVED STICKERS</b>\n{DIV}\n\n"
+            f"<b>{len(approved)}</b> sticker(s) ready to publish.\n\n"
+            "<i>These stickers can be added to your packs or collections.</i>"
+        )
+
+    await update.message.reply_text(
+        text, parse_mode="HTML", reply_markup=home_keyboard()
+    )
+
+
+async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show the user's rejected and expired stickers (the trash bin)."""
+    user = update.effective_user
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    user_row = get_or_create_user(user.id, user.username)
+    c.execute(
+        "SELECT id, status, created_at FROM sticker_drafts "
+        "WHERE user_id = ? AND status IN ('rejected', 'expired') ORDER BY created_at DESC",
+        (user_row['id'],)
+    )
+    rows = c.fetchall()
+    conn.close()
+
+    if not rows:
+        text = (
+            f"🗑 <b>TRASH</b>\n{DIV}\n\n"
+            "Nothing in the trash — all clean."
+        )
+    else:
+        text = (
+            f"🗑 <b>TRASH</b>\n{DIV}\n\n"
+            f"<b>{len(rows)}</b> discarded sticker(s).\n\n"
+        )
+        for draft_id, status, created_at in rows[:10]:
+            text += f"◦ #{draft_id} — <i>{status}</i> on {created_at[:10]}\n"
+        if len(rows) > 10:
+            text += f"\n<i>…and {len(rows) - 10} more.</i>"
+
+    await update.message.reply_text(
+        text, parse_mode="HTML", reply_markup=home_keyboard()
+    )
+
+
+async def catalog_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show the available sticker style catalog.
+
+    Displays all active styles from the catalog_styles table, grouped by
+    plan tier so users know which styles are available on their plan.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute(
+        "SELECT name, slug, description, category, plan_access "
+        "FROM catalog_styles WHERE status = 'active' ORDER BY plan_access, name"
+    )
+    styles = c.fetchall()
+    conn.close()
+
+    if not styles:
+        text = (
+            f"🎨 <b>STYLE CATALOG</b>\n{DIV}\n\n"
+            "No styles available yet — check back soon!\n\n"
+            "<i>New styles are added regularly for all plans.</i>"
+        )
+    else:
+        text = f"🎨 <b>STYLE CATALOG</b>\n{DIV}\n\n"
+        for name, slug, description, category, plan_access in styles:
+            tier_icon = {"free": "🆓", "premium": "⭐", "pro": "💎"}.get(plan_access, "🆓")
+            text += f"{tier_icon} <b>{name}</b>"
+            if category:
+                text += f" <i>({category})</i>"
+            text += "\n"
+            if description:
+                text += f"   {description}\n"
+        text += "\n<i>Use /plans to see what each tier includes.</i>"
+
+    await update.message.reply_text(
+        text, parse_mode="HTML", reply_markup=home_keyboard()
+    )
+
+
+async def plans_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show the available subscription plans and their creation quotas."""
+    user = update.effective_user
+    current_plan = get_user_plan(user.id)
+    _, remaining = check_creation_limit(user.id)
+
+    text = (
+        f"💎 <b>PLANS</b>\n{DIV}\n\n"
+        f"Your current plan: <b>{current_plan.upper()}</b>\n"
+        f"Remaining creations this period: <b>{remaining}</b>\n\n"
+        "──────────────────────\n"
+        "🆓 <b>Free</b>\n"
+        "  · 3 creations per day\n"
+        "  · 10 drafts\n"
+        "  · Basic styles\n\n"
+        "⭐ <b>Premium</b>\n"
+        "  · 50 creations per month\n"
+        "  · 100 drafts\n"
+        "  · All styles\n\n"
+        "💎 <b>Pro</b>\n"
+        "  · 300 creations per month\n"
+        "  · Unlimited drafts\n"
+        "  · Priority processing\n"
+        "──────────────────────\n\n"
+        "<i>Premium and Pro plans coming soon!</i>"
+    )
+
+    await update.message.reply_text(
+        text, parse_mode="HTML", reply_markup=home_keyboard()
+    )
+
+
+# ── DRAFT ACTION CALLBACKS ────────────────────────────────────
+
+async def draft_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle inline button actions from the draft vault.
+
+    Supported actions:
+      draft_approve_<id>   — move draft to 'approved'
+      draft_reject_<id>    — move draft to 'rejected'
+      draft_retry_<id>     — (placeholder) re-generate this draft
+      draft_save_<id>      — keep in vault, extend expiry by DRAFT_EXPIRY_DAYS
+    """
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data.startswith("draft_approve_"):
+        draft_id = int(data.split("draft_approve_")[1])
+        update_draft_status(draft_id, "approved")
+        await query.edit_message_text(
+            f"✅ Draft <b>#{draft_id}</b> approved!\n\n"
+            "<i>It's ready to be added to a pack or collection.</i>",
+            parse_mode="HTML",
+            reply_markup=home_keyboard()
+        )
+
+    elif data.startswith("draft_reject_"):
+        draft_id = int(data.split("draft_reject_")[1])
+        update_draft_status(draft_id, "rejected")
+        await query.edit_message_text(
+            f"🗑 Draft <b>#{draft_id}</b> rejected and moved to trash.",
+            parse_mode="HTML",
+            reply_markup=home_keyboard()
+        )
+
+    elif data.startswith("draft_retry_"):
+        draft_id = int(data.split("draft_retry_")[1])
+        await query.edit_message_text(
+            f"🔄 Draft <b>#{draft_id}</b>: retry coming soon!\n\n"
+            "<i>Re-generation will be available in Phase 2.</i>",
+            parse_mode="HTML",
+            reply_markup=home_keyboard()
+        )
+
+    elif data.startswith("draft_save_"):
+        draft_id = int(data.split("draft_save_")[1])
+        new_expiry = (_utcnow() + timedelta(days=DRAFT_EXPIRY_DAYS)).isoformat()
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute(
+            "UPDATE sticker_drafts SET expires_at = ?, updated_at = datetime('now') WHERE id = ?",
+            (new_expiry, draft_id)
+        )
+        conn.commit()
+        conn.close()
+        await query.edit_message_text(
+            f"💾 Draft <b>#{draft_id}</b> saved for later — expiry extended.",
+            parse_mode="HTML",
+            reply_markup=home_keyboard()
+        )
+
+
 # ── CALLBACK ROUTER ──────────────────────────────────────────
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1129,6 +1687,38 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await delete_pack_callback(update, context)
     elif data.startswith("delconfirm_"):
         await delete_pack_confirm(update, context)
+    elif data.startswith("draft_"):
+        await draft_action_callback(update, context)
+    elif data == "menu_mydrafts":
+        await query.answer()
+        await query.message.reply_text(
+            "Use /mydrafts to view your pending drafts.",
+            reply_markup=home_keyboard()
+        )
+    elif data == "menu_myapproved":
+        await query.answer()
+        await query.message.reply_text(
+            "Use /myapproved to view your approved stickers.",
+            reply_markup=home_keyboard()
+        )
+    elif data == "menu_trash":
+        await query.answer()
+        await query.message.reply_text(
+            "Use /trash to view rejected and expired stickers.",
+            reply_markup=home_keyboard()
+        )
+    elif data == "menu_catalog":
+        await query.answer()
+        await query.message.reply_text(
+            "Use /catalog to browse available styles.",
+            reply_markup=home_keyboard()
+        )
+    elif data == "menu_plans":
+        await query.answer()
+        await query.message.reply_text(
+            "Use /plans to view subscription plans.",
+            reply_markup=home_keyboard()
+        )
 
 
 # ── MAIN ─────────────────────────────────────────────────────
@@ -1165,6 +1755,13 @@ def main():
     application.add_handler(CommandHandler("manage", manage_stickers))
     application.add_handler(CommandHandler("help", show_help))
     application.add_handler(CommandHandler("about", show_about))
+    # Draft vault & lifecycle commands
+    application.add_handler(CommandHandler("mydrafts", mydrafts_command))
+    application.add_handler(CommandHandler("myapproved", myapproved_command))
+    application.add_handler(CommandHandler("trash", trash_command))
+    # Catalog & plan commands
+    application.add_handler(CommandHandler("catalog", catalog_command))
+    application.add_handler(CommandHandler("plans", plans_command))
 
     create_conv = ConversationHandler(
         entry_points=[CommandHandler("create", create_start), CallbackQueryHandler(create_start, pattern="^menu_create$")],
@@ -1220,6 +1817,11 @@ def main():
     web_thread = threading.Thread(target=run_api, daemon=True)
     web_thread.start()
     logger.info("API + landing page serving on port 5000")
+
+    # Start the background cleanup worker (expires stale drafts daily)
+    cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
+    cleanup_thread.start()
+    logger.info("Draft cleanup worker started")
 
     logger.info("Stix Magic bot is running...")
     application.run_polling()
