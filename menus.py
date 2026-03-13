@@ -24,6 +24,7 @@ MENU_STRUCTURE = {
             ],
             [
                 {"label": "⭐ AI GENERATE", "action": "menu_generate"},
+                {"label": "⭐ PREMIUM ▸", "action": "menu_premium"},
             ],
             [
                 {"label": "🟠 HELP", "nav": "help"},

@@ -8,11 +8,12 @@ import random
 import threading
 import subprocess
 import tempfile
+import time
 from PIL import Image, ImageOps
-from telegram import Update, InputSticker, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InputSticker, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    ConversationHandler, ContextTypes, CallbackQueryHandler
+    ConversationHandler, ContextTypes, CallbackQueryHandler, PreCheckoutQueryHandler
 )
 from menus import build_keyboard, get_menu_text
 from openai_helper import generate_sticker_image
@@ -43,9 +44,14 @@ def init_db():
     ''')
     c.execute('''
         CREATE TABLE IF NOT EXISTS premium_users (
-            user_id INTEGER PRIMARY KEY
+            user_id INTEGER PRIMARY KEY,
+            expires_at INTEGER DEFAULT NULL
         )
     ''')
+    # migrate: add expires_at if it doesn't exist yet (upgrade from earlier schema)
+    cols = [row[1] for row in c.execute("PRAGMA table_info(premium_users)").fetchall()]
+    if "expires_at" not in cols:
+        c.execute("ALTER TABLE premium_users ADD COLUMN expires_at INTEGER DEFAULT NULL")
     conn.commit()
     conn.close()
 
@@ -107,16 +113,51 @@ def is_new_user(user_id):
 def is_premium_user(user_id):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute('SELECT 1 FROM premium_users WHERE user_id = ?', (user_id,))
+    c.execute('SELECT expires_at FROM premium_users WHERE user_id = ?', (user_id,))
     row = c.fetchone()
     conn.close()
-    return row is not None
+    if row is None:
+        return False
+    expires_at = row[0]
+    # NULL expires_at means lifetime (admin-granted)
+    if expires_at is None:
+        return True
+    return int(time.time()) < expires_at
 
 
-def grant_premium(user_id):
+def get_premium_expiry(user_id):
+    """Return the Unix timestamp of expiry, None for lifetime, or -1 if not premium."""
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute('INSERT OR IGNORE INTO premium_users (user_id) VALUES (?)', (user_id,))
+    c.execute('SELECT expires_at FROM premium_users WHERE user_id = ?', (user_id,))
+    row = c.fetchone()
+    conn.close()
+    if row is None:
+        return -1
+    return row[0]  # None = lifetime
+
+
+def grant_premium(user_id, days=None):
+    """Grant premium. days=None for lifetime (admin); days=N for a time-limited subscription."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    if days is None:
+        expires_at = None
+    else:
+        # If already premium, extend from current expiry; otherwise start from now
+        c.execute('SELECT expires_at FROM premium_users WHERE user_id = ?', (user_id,))
+        row = c.fetchone()
+        now = int(time.time())
+        if row and row[0] and row[0] > now:
+            base = row[0]
+        else:
+            base = now
+        expires_at = base + days * 86400
+    c.execute(
+        'INSERT INTO premium_users (user_id, expires_at) VALUES (?, ?) '
+        'ON CONFLICT(user_id) DO UPDATE SET expires_at = ?',
+        (user_id, expires_at, expires_at)
+    )
     conn.commit()
     conn.close()
 
@@ -136,6 +177,15 @@ WAITING_GENERATE_PROMPT, WAITING_GENERATE_PACK = range(7, 9)
 
 STICKER_EMOJI = ["✨"]
 MAX_PROMPT_LENGTH = 500
+
+# ── PREMIUM PRICING (Telegram Stars) ─────────────────────────
+# 1 Star ≈ $0.013 USD (as of March 2026) — see https://telegram.org/blog/stars
+# Adjust prices to match your market
+PREMIUM_PLANS = {
+    "premium_1m":   {"label": "1 Month",   "stars": 250,  "days": 30},
+    "premium_3m":   {"label": "3 Months",  "stars": 599,  "days": 90},
+    "premium_life": {"label": "Lifetime",  "stars": 999,  "days": None},
+}
 
 DIV = "─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─"
 
@@ -820,6 +870,124 @@ async def magic_pack_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+# ── PREMIUM — PAGE & STARS PAYMENT ──────────────────────────
+
+async def show_premium_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show the premium features/pricing page — accessible by all users."""
+    user = update.effective_user
+
+    if update.callback_query:
+        await update.callback_query.answer()
+
+    premium = is_premium_user(user.id)
+    expiry = get_premium_expiry(user.id)
+
+    if premium:
+        if expiry is None:
+            status = "⭐ <b>Lifetime</b>"
+        else:
+            from datetime import datetime, timezone
+            dt = datetime.fromtimestamp(expiry, tz=timezone.utc)
+            status = f"⭐ Active · expires <b>{dt.strftime('%d %b %Y')}</b>"
+    else:
+        status = "— not subscribed"
+
+    text = (
+        f"⭐ <b>STIX MAGIC PREMIUM</b>\n"
+        f"{DIV}\n\n"
+        f"Status: {status}\n\n"
+        "<b>What you unlock:</b>\n"
+        "🤖 <b>AI Sticker Generator</b> — describe any idea,\n"
+        "   DALL-E 3 draws it as a sticker\n\n"
+        "<b>Plans (pay with Telegram ⭐ Stars):</b>\n"
+        "◦ 1 Month  —  <b>250 ⭐</b>\n"
+        "◦ 3 Months  —  <b>599 ⭐</b>  <i>(save 20%)</i>\n"
+        "◦ Lifetime  —  <b>999 ⭐</b>  <i>(best value)</i>\n\n"
+        "<i>Stars are Telegram's native currency.\n"
+        "No credit card, no signup — pay in one tap.</i>"
+    )
+
+    if premium:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🤖 AI GENERATE", callback_data="menu_generate")],
+            [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+        ])
+    else:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⭐ Buy 1 Month · 250 Stars", callback_data="buy_premium_1m")],
+            [InlineKeyboardButton("⭐ Buy 3 Months · 599 Stars", callback_data="buy_premium_3m")],
+            [InlineKeyboardButton("⭐ Buy Lifetime · 999 Stars", callback_data="buy_premium_life")],
+            [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+        ])
+
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
+    else:
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
+
+
+async def buy_premium_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send a Stars invoice when the user taps one of the buy buttons."""
+    query = update.callback_query
+    await query.answer()
+
+    plan_key = query.data.replace("buy_", "")  # e.g. "premium_1m"
+    plan = PREMIUM_PLANS.get(plan_key)
+    if not plan:
+        await query.answer("Unknown plan.", show_alert=True)
+        return
+
+    await context.bot.send_invoice(
+        chat_id=query.message.chat_id,
+        title=f"Stix Magic Premium — {plan['label']}",
+        description=(
+            "Unlock AI sticker generation powered by DALL-E 3. "
+            "Describe any idea and get a Telegram sticker in seconds."
+        ),
+        payload=plan_key,
+        currency="XTR",
+        prices=[LabeledPrice(label=f"Premium {plan['label']}", amount=plan["stars"])],
+    )
+
+
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Accept all valid Stars pre-checkout queries."""
+    query = update.pre_checkout_query
+    if query.invoice_payload not in PREMIUM_PLANS:
+        await query.answer(ok=False, error_message="Unknown plan. Please try again.")
+        return
+    await query.answer(ok=True)
+
+
+async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Grant premium after a successful Stars payment."""
+    payment = update.message.successful_payment
+    plan_key = payment.invoice_payload
+    plan = PREMIUM_PLANS.get(plan_key)
+    if not plan:
+        logger.error(f"Received payment for unknown plan: {plan_key}")
+        return
+
+    user = update.effective_user
+    grant_premium(user.id, days=plan["days"])
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🤖 AI GENERATE — Try it now!", callback_data="menu_generate")],
+        [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+    ])
+    await update.message.reply_text(
+        f"⭐ <b>Welcome to Premium!</b>\n"
+        f"{DIV}\n\n"
+        f"Your <b>{plan['label']}</b> subscription is active.\n\n"
+        "You can now use <b>AI Sticker Generator</b>:\n"
+        "describe any idea → DALL-E draws it → sticker ready.\n\n"
+        "<i>Tap below to start generating.</i>",
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
+    logger.info(f"Premium granted: user={user.id} plan={plan_key} label={plan['label']}")
+
+
 # ── PREMIUM — ADMIN COMMANDS ─────────────────────────────────
 
 def _get_admin_id():
@@ -846,8 +1014,8 @@ async def grant_premium_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠ Invalid user ID.")
         return
 
-    grant_premium(target_id)
-    await update.message.reply_text(f"✦ Premium granted to user <code>{target_id}</code>.", parse_mode="HTML")
+    grant_premium(target_id, days=None)
+    await update.message.reply_text(f"✦ Premium (lifetime) granted to user <code>{target_id}</code>.", parse_mode="HTML")
 
 
 async def revoke_premium_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -884,9 +1052,12 @@ async def generate_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{DIV}\n\n"
             "AI sticker generation is available to\n"
             "<b>premium members</b> only.\n\n"
-            "<i>Contact the bot admin to upgrade.</i>"
+            "<i>Subscribe below to unlock it instantly.</i>"
         )
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("✦ Home", callback_data="nav:home")]])
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⭐ See Plans & Subscribe", callback_data="menu_premium")],
+            [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+        ])
         if update.callback_query:
             await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
         else:
@@ -1231,20 +1402,27 @@ async def settings_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     inverted = get_mask_inverted(user.id)
     current = "⬛ Black = keep" if inverted else "⬜ White = keep"
     toggle_label = "Switch to ⬜ White = keep" if inverted else "Switch to ⬛ Black = keep"
+    premium = is_premium_user(user.id)
+    premium_line = "⭐ Premium: <b>Active</b>" if premium else "⭐ Premium: <i>not subscribed</i>"
 
     text = (
         f"◐ <b>MASK MODE</b>\n"
         f"{DIV}\n\n"
         f"Current: <b>{current}</b>\n\n"
         "<i>This controls which color in your mask\n"
-        "gets kept when cutting a sticker.</i>"
+        "gets kept when cutting a sticker.</i>\n\n"
+        f"{premium_line}"
     )
 
-    keyboard = InlineKeyboardMarkup([
+    buttons = [
         [InlineKeyboardButton(toggle_label, callback_data="toggle_mask")],
-        [InlineKeyboardButton("◂ Back", callback_data="nav:settings"),
-         InlineKeyboardButton("✦ Home", callback_data="nav:home")],
-    ])
+    ]
+    if not premium:
+        buttons.append([InlineKeyboardButton("⭐ Upgrade to Premium", callback_data="menu_premium")])
+    buttons.append([InlineKeyboardButton("◂ Back", callback_data="nav:settings"),
+                    InlineKeyboardButton("✦ Home", callback_data="nav:home")])
+
+    keyboard = InlineKeyboardMarkup(buttons)
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
@@ -1271,6 +1449,10 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_packs(update, context)
     elif data == "menu_about":
         await show_about(update, context)
+    elif data == "menu_premium":
+        await show_premium_page(update, context)
+    elif data.startswith("buy_premium_"):
+        await buy_premium_callback(update, context)
     elif data == "settings_mask":
         await settings_mask(update, context)
     elif data == "toggle_mask":
@@ -1303,8 +1485,11 @@ def main():
     application.add_handler(CommandHandler("manage", manage_stickers))
     application.add_handler(CommandHandler("help", show_help))
     application.add_handler(CommandHandler("about", show_about))
+    application.add_handler(CommandHandler("premium", show_premium_page))
     application.add_handler(CommandHandler("grantpremium", grant_premium_cmd))
     application.add_handler(CommandHandler("revokepremium", revoke_premium_cmd))
+    application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
 
     create_conv = ConversationHandler(
         entry_points=[CommandHandler("create", create_start), CallbackQueryHandler(create_start, pattern="^menu_create$")],
