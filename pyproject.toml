@@ -1,9 +1,9 @@
 [tool.poetry]
-name = "sticker-lab-bot"
+name = "stixmagic"
 version = "1.0.0"
-description = "Telegram sticker pack creation and management bot with Mini App support"
+description = "Stix Magic – Telegram sticker alchemy platform and bot ecosystem"
 authors = ["PupFr <aroo@pupfrisky.com>"]
-readme = "MINIAPP_TEMPLATE.md"
+readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
