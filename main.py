@@ -1420,6 +1420,27 @@ def main():
             except Exception as e:
                 logger.warning(f"Could not set menu button: {e}")
 
+        from telegram import BotCommand
+        try:
+            await app.bot.set_my_commands([
+                BotCommand("start",      "Open the main menu"),
+                BotCommand("create",     "Forge a new sticker pack"),
+                BotCommand("addsticker", "Add a sticker to an existing pack"),
+                BotCommand("magic",      "Cut out a subject with a B&W mask"),
+                BotCommand("sync",       "Import / summon an existing pack"),
+                BotCommand("catalog",    "Browse the community sticker catalog"),
+                BotCommand("search",     "Search the sticker catalog"),
+                BotCommand("feature",    "Publish your pack to the catalog"),
+                BotCommand("info",       "Get info & stats for any sticker pack"),
+                BotCommand("packs",      "View all your packs"),
+                BotCommand("manage",     "Manage / delete your packs"),
+                BotCommand("help",       "Show all commands and tips"),
+                BotCommand("cancel",     "Cancel the current operation"),
+            ])
+            logger.info("Bot commands registered")
+        except Exception as e:
+            logger.warning(f"Could not set bot commands: {e}")
+
     application = Application.builder().token(token).post_init(post_init).build()
 
     application.add_handler(CommandHandler("start", start))
