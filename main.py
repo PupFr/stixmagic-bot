@@ -9,16 +9,24 @@ import threading
 
 from telegram import (
     InputSticker, InlineKeyboardButton, InlineKeyboardMarkup,
+    InlineQueryResultArticle, InputTextMessageContent,
     MenuButtonWebApp, Update, WebAppInfo,
 )
 from telegram.error import BadRequest
 from telegram.ext import (
     Application, CallbackQueryHandler, CommandHandler, ContextTypes,
-    ConversationHandler, MessageHandler, filters,
+    ConversationHandler, InlineQueryHandler, MessageHandler, filters,
 )
 
 from infra.db import (
     add_pack as add_pack_to_db,
+    catalog_add_pack,
+    catalog_get_pack,
+    catalog_get_user_reaction,
+    catalog_increment_views,
+    catalog_react,
+    catalog_search,
+    catalog_count,
     delete_pack as delete_pack_from_db,
     get_mask_inverted,
     get_user_packs,
@@ -63,6 +71,8 @@ WAITING_TITLE, WAITING_STICKER = range(2)
 CHOOSING_PACK, WAITING_STICKER_ADD = range(2, 4)
 WAITING_SOURCE_IMAGE, WAITING_MASK_IMAGE, WAITING_CUT_PACK = range(4, 7)
 WAITING_SYNC_NAME = 7
+WAITING_FEATURE_PACK, WAITING_FEATURE_DESC = range(8, 10)
+WAITING_CATALOG_SEARCH = 10
 
 STICKER_EMOJI = ["✨"]
 
@@ -605,6 +615,458 @@ async def magic_pack_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+# ── CATALOG ───────────────────────────────────────────────────
+
+CATALOG_PAGE_SIZE = 5
+
+
+def _catalog_pack_text(pack: dict, user_reaction: str | None = None) -> str:
+    likes = pack.get("likes", 0)
+    dislikes = pack.get("dislikes", 0)
+    views = pack.get("view_count", 0)
+    desc = pack.get("description", "")
+    like_mark = " ◀" if user_reaction == "like" else ""
+    dislike_mark = " ◀" if user_reaction == "dislike" else ""
+    text = (
+        f"🔍 <b>{html.escape(pack['title'])}</b>\n"
+        f"<code>{html.escape(pack['name'])}</code>\n"
+    )
+    if desc:
+        text += f"\n<i>{html.escape(desc)}</i>\n"
+    text += (
+        f"\n👁 {views}  ·  👍 {likes}{like_mark}  ·  👎 {dislikes}{dislike_mark}"
+    )
+    return text
+
+
+async def catalog_show_page(update: Update, sort: str, query: str, page: int):
+    """Render a catalog page (edit or send new message)."""
+    offset = page * CATALOG_PAGE_SIZE
+    packs = catalog_search(query=query, sort=sort, limit=CATALOG_PAGE_SIZE, offset=offset)
+    total = catalog_count(query=query, sort=sort)
+
+    if not packs:
+        if page > 0:
+            page = 0
+            offset = 0
+            packs = catalog_search(query=query, sort=sort, limit=CATALOG_PAGE_SIZE, offset=offset)
+
+    if not packs:
+        msg = (
+            f"🔍 <b>STICKER CATALOG</b>\n{DIV}\n\n"
+            "No packs found in the catalog yet.\n\n"
+            "<i>Use /feature to publish your pack!</i>"
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚗️ Feature a Pack", callback_data="menu_feature")],
+            [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+        ])
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=keyboard)
+        else:
+            await update.message.reply_text(msg, parse_mode="HTML", reply_markup=keyboard)
+        return
+
+    # Show first pack of the page with nav
+    pack = packs[0]
+    catalog_increment_views(pack["name"])
+
+    user_id = update.effective_user.id
+    reaction = catalog_get_user_reaction(user_id, pack["name"])
+    text = _catalog_pack_text(pack, reaction)
+
+    max_page = max(0, (total - 1) // CATALOG_PAGE_SIZE)
+    safe_page = min(page, max_page)
+
+    rows = [
+        [
+            InlineKeyboardButton("👍 Like", callback_data=f"cat_like_{pack['name']}"),
+            InlineKeyboardButton("👎 Dislike", callback_data=f"cat_dislike_{pack['name']}"),
+        ],
+        [InlineKeyboardButton("➕ Add to Telegram", url=f"https://t.me/addstickers/{pack['name']}")],
+    ]
+
+    nav = []
+    if safe_page > 0:
+        nav.append(InlineKeyboardButton("◂ Prev", callback_data=f"cat_page_{sort}__{safe_page - 1}"))
+    nav.append(InlineKeyboardButton(f"{safe_page + 1}/{max_page + 1}", callback_data="noop"))
+    if safe_page < max_page:
+        nav.append(InlineKeyboardButton("Next ▸", callback_data=f"cat_page_{sort}__{safe_page + 1}"))
+    rows.append(nav)
+
+    sort_row = [
+        InlineKeyboardButton("🔥 Popular" if sort != "popular" else "✓ Popular", callback_data="cat_sort_popular"),
+        InlineKeyboardButton("📈 Trending" if sort != "trending" else "✓ Trending", callback_data="cat_sort_trending"),
+        InlineKeyboardButton("🆕 New" if sort != "new" else "✓ New", callback_data="cat_sort_new"),
+    ]
+    rows.append(sort_row)
+    rows.append([
+        InlineKeyboardButton("🔍 Search", callback_data="menu_catalog_search"),
+        InlineKeyboardButton("⚗️ Feature Pack", callback_data="menu_feature"),
+    ])
+    rows.append([InlineKeyboardButton("✦ Home", callback_data="nav:home")])
+
+    keyboard = InlineKeyboardMarkup(rows)
+    header = f"🔍 <b>STICKER CATALOG</b> · {sort.upper()}\n{DIV}\n\n"
+
+    if update.callback_query:
+        await update.callback_query.answer()
+        try:
+            await update.callback_query.edit_message_text(
+                header + text, parse_mode="HTML", reply_markup=keyboard,
+                disable_web_page_preview=True
+            )
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                raise
+    else:
+        await update.message.reply_text(
+            header + text, parse_mode="HTML", reply_markup=keyboard,
+            disable_web_page_preview=True
+        )
+
+
+async def catalog_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Entry point for /catalog command and menu_catalog callback."""
+    if update.callback_query:
+        await update.callback_query.answer()
+    sort = context.args[0] if context.args else "popular"
+    if sort not in ("popular", "trending", "new"):
+        sort = "popular"
+    await catalog_show_page(update, sort=sort, query="", page=0)
+
+
+async def catalog_search_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ask user for search query."""
+    if context.args:
+        return await _catalog_do_search(update, context, " ".join(context.args))
+
+    msg = (
+        f"🔍 <b>SEARCH THE CATALOG</b>\n{DIV}\n\n"
+        "Type your search query:"
+    )
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("✕ Cancel", callback_data="menu_catalog")]])
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=keyboard)
+    else:
+        await update.message.reply_text(msg, parse_mode="HTML", reply_markup=keyboard)
+    return WAITING_CATALOG_SEARCH
+
+
+async def catalog_search_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await _catalog_do_search(update, context, update.message.text.strip())
+
+
+async def _catalog_do_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: str):
+    if len(query) < 2:
+        await update.message.reply_text("⚠ Query must be at least 2 characters.")
+        return WAITING_CATALOG_SEARCH
+    await catalog_show_page(update, sort="search", query=query, page=0)
+    return ConversationHandler.END
+
+
+async def catalog_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle cat_page_<sort>_<query>_<page> callbacks."""
+    query = update.callback_query
+    data = query.data  # e.g. cat_page_popular__2
+    parts = data[len("cat_page_"):].rsplit("_", 1)
+    if len(parts) != 2:
+        await query.answer()
+        return
+    sort_query, page_str = parts
+    sq_parts = sort_query.split("_", 1)
+    sort = sq_parts[0]
+    q = sq_parts[1] if len(sq_parts) > 1 else ""
+    try:
+        page = int(page_str)
+    except ValueError:
+        page = 0
+    await catalog_show_page(update, sort=sort, query=q, page=page)
+
+
+async def catalog_sort_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle cat_sort_<sort> callbacks."""
+    sort = update.callback_query.data.replace("cat_sort_", "")
+    await catalog_show_page(update, sort=sort, query="", page=0)
+
+
+async def catalog_react_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle cat_like_<name> and cat_dislike_<name> callbacks."""
+    query = update.callback_query
+    data = query.data
+    if data.startswith("cat_like_"):
+        reaction = "like"
+        pack_name = data[len("cat_like_"):]
+    else:
+        reaction = "dislike"
+        pack_name = data[len("cat_dislike_"):]
+
+    pack = catalog_get_pack(pack_name)
+    if not pack:
+        await query.answer("Pack not found in catalog.")
+        return
+
+    result = catalog_react(query.from_user.id, pack_name, reaction)
+    await query.answer(f"👍 {result['likes']}  👎 {result['dislikes']}")
+
+    # Refresh pack data and re-render
+    pack = catalog_get_pack(pack_name)
+    if pack:
+        user_reaction = catalog_get_user_reaction(query.from_user.id, pack_name)
+        text = _catalog_pack_text(pack, user_reaction)
+        try:
+            await query.edit_message_text(
+                f"🔍 <b>STICKER CATALOG</b>\n{DIV}\n\n" + text,
+                parse_mode="HTML",
+                reply_markup=query.message.reply_markup,
+                disable_web_page_preview=True,
+            )
+        except BadRequest:
+            pass
+
+
+async def pack_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/info <packname> — show catalog info about a pack."""
+    pack_name = " ".join(context.args).strip() if context.args else ""
+    if not pack_name:
+        await update.message.reply_text(
+            f"🔍 <b>PACK INFO</b>\n{DIV}\n\n"
+            "Usage: <code>/info pack_name</code>\n"
+            "or: <code>/info https://t.me/addstickers/pack_name</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    if "t.me/addstickers/" in pack_name:
+        pack_name = pack_name.split("t.me/addstickers/")[-1].strip().rstrip("/")
+
+    progress = await update.message.reply_text("🔍 <i>Consulting the archives...</i>", parse_mode="HTML")
+
+    # Try to get from Telegram first
+    try:
+        ss = await context.bot.get_sticker_set(pack_name)
+        title = ss.title
+        sticker_type = ss.sticker_type
+        count = len(ss.stickers)
+        animated = any(s.is_animated for s in ss.stickers)
+        video = any(s.is_video for s in ss.stickers)
+        kind = "video" if video else ("animated" if animated else "static")
+    except Exception:
+        await progress.edit_text(
+            f"⚠ Pack <code>{html.escape(pack_name)}</code> not found on Telegram.",
+            parse_mode="HTML",
+            reply_markup=home_keyboard(),
+        )
+        return
+
+    catalog_pack = catalog_get_pack(pack_name)
+    user_reaction = catalog_get_user_reaction(update.effective_user.id, pack_name) if catalog_pack else None
+
+    text = (
+        f"🔍 <b>{html.escape(title)}</b>\n"
+        f"{DIV}\n\n"
+        f"<b>Name:</b> <code>{html.escape(pack_name)}</code>\n"
+        f"<b>Type:</b> {kind}  ·  <b>Stickers:</b> {count}\n"
+    )
+    if catalog_pack:
+        catalog_increment_views(pack_name)
+        likes = catalog_pack.get("likes", 0)
+        dislikes = catalog_pack.get("dislikes", 0)
+        views = catalog_pack.get("view_count", 0)
+        like_mark = " ◀" if user_reaction == "like" else ""
+        dislike_mark = " ◀" if user_reaction == "dislike" else ""
+        text += f"\n👁 {views}  ·  👍 {likes}{like_mark}  ·  👎 {dislikes}{dislike_mark}\n"
+        if catalog_pack.get("description"):
+            text += f"\n<i>{html.escape(catalog_pack['description'])}</i>\n"
+        rows = [
+            [
+                InlineKeyboardButton("👍 Like", callback_data=f"cat_like_{pack_name}"),
+                InlineKeyboardButton("👎 Dislike", callback_data=f"cat_dislike_{pack_name}"),
+            ],
+            [InlineKeyboardButton("➕ Add to Telegram", url=f"https://t.me/addstickers/{pack_name}")],
+            [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+        ]
+    else:
+        text += "\n<i>Not yet in the Stix Magic catalog.</i>\n"
+        rows = [
+            [InlineKeyboardButton("➕ Add to Telegram", url=f"https://t.me/addstickers/{pack_name}")],
+            [InlineKeyboardButton("⚗️ Feature this Pack", callback_data=f"feature_pack_{pack_name}")],
+            [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+        ]
+
+    await progress.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(rows))
+
+
+# ── FEATURE / PUBLISH PACK ────────────────────────────────────
+
+async def feature_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Entry for /feature command and menu_feature / feature_pack_<name> callbacks."""
+    pack_name = None
+    if update.callback_query:
+        await update.callback_query.answer()
+        data = update.callback_query.data
+        if data.startswith("feature_pack_"):
+            pack_name = data[len("feature_pack_"):]
+
+    if pack_name:
+        context.user_data['feature_name'] = pack_name
+        return await _feature_ask_desc(update, context)
+
+    user = update.effective_user
+    packs = await validate_and_sync_packs(context.bot, user.id)
+
+    if not packs:
+        msg = (
+            f"⚗️ <b>FEATURE A PACK</b>\n{DIV}\n\n"
+            "You have no packs yet. Forge one first!"
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚗️ Forge a Pack", callback_data="menu_create")],
+            [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+        ])
+        if update.callback_query:
+            await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=keyboard)
+        else:
+            await update.message.reply_text(msg, parse_mode="HTML", reply_markup=keyboard)
+        return ConversationHandler.END
+
+    keyboard_rows = [
+        [InlineKeyboardButton(f"▦ {title}", callback_data=f"featpack_{name}")]
+        for name, title in packs
+    ]
+    keyboard_rows.append([InlineKeyboardButton("✕ Cancel", callback_data="nav:home")])
+    msg = (
+        f"⚗️ <b>FEATURE A PACK</b>\n{DIV}\n\n"
+        "Which pack shall be published to the catalog?"
+    )
+    if update.callback_query:
+        await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard_rows))
+    else:
+        await update.message.reply_text(msg, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard_rows))
+    return WAITING_FEATURE_PACK
+
+
+async def feature_pack_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    pack_name = query.data.replace("featpack_", "")
+    context.user_data['feature_name'] = pack_name
+    return await _feature_ask_desc(update, context)
+
+
+async def _feature_ask_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pack_name = context.user_data.get('feature_name', '')
+    msg = (
+        f"⚗️ <b>FEATURE A PACK</b>\n{DIV}\n\n"
+        f"Pack: <code>{html.escape(pack_name)}</code>\n\n"
+        "Add a short description (or send <b>-</b> to skip):"
+    )
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("✕ Cancel", callback_data="nav:home")]])
+    if update.callback_query:
+        await update.callback_query.edit_message_text(msg, parse_mode="HTML", reply_markup=keyboard)
+    else:
+        await update.message.reply_text(msg, parse_mode="HTML", reply_markup=keyboard)
+    return WAITING_FEATURE_DESC
+
+
+async def feature_desc_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    desc = update.message.text.strip()
+    if desc == "-":
+        desc = ""
+    pack_name = context.user_data.get('feature_name', '')
+    user = update.effective_user
+
+    progress = await update.message.reply_text("⚗️ <i>Publishing to the catalog...</i>", parse_mode="HTML")
+
+    try:
+        ss = await context.bot.get_sticker_set(pack_name)
+        title = ss.title
+        animated = any(s.is_animated for s in ss.stickers)
+        video = any(s.is_video for s in ss.stickers)
+        pack_type = "video" if video else ("animated" if animated else "image")
+    except Exception:
+        await progress.edit_text(
+            f"⚠ Pack <code>{html.escape(pack_name)}</code> not found on Telegram.",
+            parse_mode="HTML",
+            reply_markup=home_keyboard(),
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    added = catalog_add_pack(pack_name, title, user.id, description=desc, pack_type=pack_type)
+
+    if added:
+        await progress.edit_text(
+            f"✦ <b>Pack featured!</b>\n{DIV}\n\n"
+            f"<b>{html.escape(title)}</b> is now in the Stix Magic catalog.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 View Catalog", callback_data="menu_catalog")],
+                [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+            ]),
+        )
+    else:
+        await progress.edit_text(
+            f"✦ <b>{html.escape(title)}</b> is already in the catalog.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 View Catalog", callback_data="menu_catalog")],
+                [InlineKeyboardButton("✦ Home", callback_data="nav:home")],
+            ]),
+        )
+
+    context.user_data.clear()
+    return ConversationHandler.END
+
+
+# ── INLINE QUERY ──────────────────────────────────────────────
+
+async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle inline queries: @botname <query>."""
+    query_text = update.inline_query.query.strip()
+
+    if not query_text:
+        packs = catalog_search(sort="popular", limit=10)
+    else:
+        packs = catalog_search(query=query_text, sort="search", limit=10)
+
+    results = []
+    for pack in packs:
+        name = pack["name"]
+        title = pack["title"]
+        desc = pack.get("description", "")
+        likes = pack.get("likes", 0)
+        dislikes = pack.get("dislikes", 0)
+        message_text = (
+            f"🔍 <b>{html.escape(title)}</b>\n"
+            f"<code>{html.escape(name)}</code>\n"
+        )
+        if desc:
+            message_text += f"\n<i>{html.escape(desc)}</i>\n"
+        message_text += f"\n👍 {likes}  ·  👎 {dislikes}"
+        message_text += f"\n\n➕ <a href=\"https://t.me/addstickers/{name}\">Add to Telegram</a>"
+
+        results.append(
+            InlineQueryResultArticle(
+                id=name,
+                title=title,
+                description=f"{'📦 ' + desc if desc else ''}  👍{likes} 👎{dislikes}",
+                input_message_content=InputTextMessageContent(
+                    message_text=message_text,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                ),
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("➕ Add to Telegram", url=f"https://t.me/addstickers/{name}")],
+                ]),
+            )
+        )
+
+    await update.inline_query.answer(results, cache_time=30, is_personal=False)
+
+
 # ── PACKS / MANAGE / HELP / ABOUT ───────────────────────────
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -917,6 +1379,18 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await delete_pack_callback(update, context)
     elif data.startswith("delconfirm_"):
         await delete_pack_confirm(update, context)
+    elif data == "menu_catalog" or data == "menu_catalog_browse":
+        await catalog_start(update, context)
+    elif data == "menu_catalog_search":
+        await catalog_search_start(update, context)
+    elif data == "noop":
+        await query.answer()
+    elif data.startswith("cat_sort_"):
+        await catalog_sort_callback(update, context)
+    elif data.startswith("cat_page_"):
+        await catalog_page_callback(update, context)
+    elif data.startswith("cat_like_") or data.startswith("cat_dislike_"):
+        await catalog_react_callback(update, context)
 
 
 # ── MAIN ─────────────────────────────────────────────────────
@@ -953,6 +1427,8 @@ def main():
     application.add_handler(CommandHandler("manage", manage_stickers))
     application.add_handler(CommandHandler("help", show_help))
     application.add_handler(CommandHandler("about", show_about))
+    application.add_handler(CommandHandler("catalog", catalog_start))
+    application.add_handler(CommandHandler("info", pack_info))
 
     create_conv = ConversationHandler(
         entry_points=[CommandHandler("create", create_start), CallbackQueryHandler(create_start, pattern="^menu_create$")],
@@ -1001,6 +1477,33 @@ def main():
     )
     application.add_handler(sync_conv)
 
+    catalog_search_conv = ConversationHandler(
+        entry_points=[
+            CommandHandler("search", catalog_search_start),
+            CallbackQueryHandler(catalog_search_start, pattern="^menu_catalog_search$"),
+        ],
+        states={
+            WAITING_CATALOG_SEARCH: [MessageHandler(filters.TEXT & ~filters.COMMAND, catalog_search_receive)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+    application.add_handler(catalog_search_conv)
+
+    feature_conv = ConversationHandler(
+        entry_points=[
+            CommandHandler("feature", feature_start),
+            CallbackQueryHandler(feature_start, pattern="^menu_feature$"),
+            CallbackQueryHandler(feature_start, pattern="^feature_pack_"),
+        ],
+        states={
+            WAITING_FEATURE_PACK: [CallbackQueryHandler(feature_pack_chosen, pattern="^featpack_")],
+            WAITING_FEATURE_DESC: [MessageHandler(filters.TEXT & ~filters.COMMAND, feature_desc_receive)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+    application.add_handler(feature_conv)
+
+    application.add_handler(InlineQueryHandler(inline_query_handler))
     application.add_handler(CallbackQueryHandler(nav_callback, pattern="^nav:"))
     application.add_handler(CallbackQueryHandler(menu_callback))
 
