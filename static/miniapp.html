@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stix Magic</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Inter font for polished typography -->
@@ -405,7 +405,9 @@
             z-index: 200;
         }
 
-        [data-tooltip]:hover::before {
+        [data-tooltip]:hover::before,
+        [data-tooltip]:focus::before,
+        [data-tooltip]:focus-visible::before {
             opacity: 1;
         }
 
@@ -746,17 +748,17 @@
 
     <!-- ── Tabs ────────────────────────────────────── -->
     <nav class="tabs" role="tablist">
-        <button class="tab-btn active" data-tab="create" role="tab" aria-selected="true"
+        <button class="tab-btn active" id="tab-btn-create" data-tab="create" role="tab" aria-selected="true"
                 aria-controls="tab-create" onclick="switchTab('create', this)">
             <i class="fa-solid fa-flask tab-icon"></i>
             <span>Create</span>
         </button>
-        <button class="tab-btn" data-tab="add" role="tab" aria-selected="false"
+        <button class="tab-btn" id="tab-btn-add" data-tab="add" role="tab" aria-selected="false"
                 aria-controls="tab-add" onclick="switchTab('add', this)">
             <i class="fa-solid fa-paintbrush tab-icon"></i>
             <span>Add Sticker</span>
         </button>
-        <button class="tab-btn" data-tab="packs" role="tab" aria-selected="false"
+        <button class="tab-btn" id="tab-btn-packs" data-tab="packs" role="tab" aria-selected="false"
                 aria-controls="tab-packs" onclick="switchTab('packs', this)">
             <i class="fa-solid fa-boxes-stacked tab-icon"></i>
             <span>My Packs</span>
@@ -1003,13 +1005,15 @@
     };
 
     // ── sendData wrapper ─────────────────────────────────────────
-    function sendData(payload) {
+    // silent=true → only logs to console (used for automatic calls like get_packs on boot)
+    // silent=false → also shows a dev-mode alert (used for user-initiated actions)
+    function sendData(payload, silent) {
         var json = JSON.stringify(payload);
         if (tg && tg.sendData) {
             tg.sendData(json);
         } else {
             console.log('[sendData]', json);
-            showAlert('[Dev mode]\n' + json);
+            if (!silent) { showAlert('[Dev mode]\n' + json); }
         }
     }
 
@@ -1024,7 +1028,7 @@
         // Show loading state in My Packs list; the Add Sticker tab uses a <select>
         // populated by populatePackSelect() once data arrives — no separate container.
         renderPacksLoading('my-packs-list');
-        sendData({ action: 'get_packs' });
+        sendData({ action: 'get_packs' }, /* silent */ true);
         packTimeoutId = setTimeout(function () {
             packTimeoutId = null;
             if (!packsLoaded) {
@@ -1101,24 +1105,70 @@
             card.className = 'pack-card';
             card.style.animationDelay = (idx * 55) + 'ms';
             var link = 'https://t.me/addstickers/' + encodeURIComponent(pack.name);
-            card.innerHTML =
-                '<div class="pack-card-icon">📦</div>' +
-                '<div class="pack-card-info">' +
-                    '<div class="pack-card-title">' + escHtml(pack.title || pack.name) + '</div>' +
-                    '<div class="pack-card-name">' + escHtml(pack.name) + '</div>' +
-                    '<a class="pack-card-link" href="' + escHtml(link) + '" target="_blank" rel="noopener noreferrer">' +
-                        '<i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.6rem"></i>' +
-                        escHtml(link) +
-                    '</a>' +
-                '</div>' +
-                '<div class="pack-card-actions">' +
-                    '<button class="btn btn-icon btn-ghost" onclick="editPack(\'' + escJs(pack.name) + '\')" ' +
-                        'data-tooltip="Edit pack" aria-label="Edit ' + escHtml(pack.name) + '">' +
-                        '<i class="fa-solid fa-pen"></i></button>' +
-                    '<button class="btn btn-icon btn-danger" onclick="deletePack(\'' + escJs(pack.name) + '\')" ' +
-                        'data-tooltip="Delete pack" aria-label="Delete ' + escHtml(pack.name) + '">' +
-                        '<i class="fa-solid fa-trash"></i></button>' +
-                '</div>';
+
+            // Build the card structure safely with DOM APIs — no inline onclick
+            var iconEl = document.createElement('div');
+            iconEl.className = 'pack-card-icon';
+            iconEl.textContent = '📦';
+
+            var infoEl = document.createElement('div');
+            infoEl.className = 'pack-card-info';
+
+            var titleEl = document.createElement('div');
+            titleEl.className = 'pack-card-title';
+            titleEl.textContent = pack.title || pack.name;
+
+            var nameEl = document.createElement('div');
+            nameEl.className = 'pack-card-name';
+            nameEl.textContent = pack.name;
+
+            var linkEl = document.createElement('a');
+            linkEl.className = 'pack-card-link';
+            linkEl.href = link;
+            linkEl.target = '_blank';
+            linkEl.rel = 'noopener noreferrer';
+            var linkIcon = document.createElement('i');
+            linkIcon.className = 'fa-solid fa-arrow-up-right-from-square';
+            linkIcon.style.fontSize = '0.6rem';
+            linkEl.appendChild(linkIcon);
+            linkEl.appendChild(document.createTextNode(' ' + link));
+
+            infoEl.appendChild(titleEl);
+            infoEl.appendChild(nameEl);
+            infoEl.appendChild(linkEl);
+
+            var actionsEl = document.createElement('div');
+            actionsEl.className = 'pack-card-actions';
+
+            var editBtn = document.createElement('button');
+            editBtn.className = 'btn btn-icon btn-ghost';
+            editBtn.setAttribute('data-tooltip', 'Edit pack');
+            editBtn.setAttribute('aria-label', 'Edit ' + pack.name);
+            var editIcon = document.createElement('i');
+            editIcon.className = 'fa-solid fa-pen';
+            editBtn.appendChild(editIcon);
+            editBtn.addEventListener('click', (function (name) {
+                return function () { window.editPack(name); };
+            }(pack.name)));
+
+            var delBtn = document.createElement('button');
+            delBtn.className = 'btn btn-icon btn-danger';
+            delBtn.setAttribute('data-tooltip', 'Delete pack');
+            delBtn.setAttribute('aria-label', 'Delete ' + pack.name);
+            var delIcon = document.createElement('i');
+            delIcon.className = 'fa-solid fa-trash';
+            delBtn.appendChild(delIcon);
+            delBtn.addEventListener('click', (function (name) {
+                return function () { window.deletePack(name); };
+            }(pack.name)));
+
+            actionsEl.appendChild(editBtn);
+            actionsEl.appendChild(delBtn);
+
+            card.appendChild(iconEl);
+            card.appendChild(infoEl);
+            card.appendChild(actionsEl);
+
             list.appendChild(card);
         });
 
@@ -1134,10 +1184,6 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
-    }
-
-    function escJs(str) {
-        return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     }
 
     // ── Character counters ───────────────────────────────────────
