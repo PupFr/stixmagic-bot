@@ -21,7 +21,7 @@ MENU_STRUCTURE = {
             "<i>the sticker alchemy laboratory</i>\n\n"
             "Every image is raw material.\n"
             "We transmute it into sticker gold.\n\n"
-            "⚗️ <b>forge</b>  ·  ◈ <b>ritual</b>  ·  📖 <b>grimoire</b>\n"
+            "⚗️ <b>forge</b>  ·  ◈ <b>ritual</b>  ·  📖 <b>grimoire</b>  ·  🔍 <b>catalog</b>\n"
         ),
         "buttons": [
             [
@@ -33,10 +33,11 @@ MENU_STRUCTURE = {
                 {"label": "⚙ ORACLE ▸", "nav": "settings"},
             ],
             [
+                {"label": "🔍 CATALOG ▸", "nav": "catalog"},
                 {"label": "📜 CODEX", "nav": "help"},
-                {"label": "✦ LORE", "action": "menu_about"},
             ],
             [
+                {"label": "✦ LORE", "action": "menu_about"},
                 {"label": "🔮 OPEN THE PORTAL", "web_app": True},
             ],
         ],
@@ -105,6 +106,29 @@ MENU_STRUCTURE = {
         ),
         "buttons": [],
         "parent": "help",
+    },
+
+    "catalog": {
+        "header": "🔍 <b>STICKER CATALOG</b>",
+        "body": (
+            "<i>discover and share sticker packs</i>\n\n"
+            "Browse popular, trending, and newly added\n"
+            "sticker packs shared by the community.\n"
+        ),
+        "buttons": [
+            [
+                {"label": "🔥 POPULAR", "action": "cat_sort_popular"},
+                {"label": "📈 TRENDING", "action": "cat_sort_trending"},
+            ],
+            [
+                {"label": "🆕 NEW", "action": "cat_sort_new"},
+                {"label": "🔍 SEARCH", "action": "menu_catalog_search"},
+            ],
+            [
+                {"label": "⚗️ FEATURE MY PACK", "action": "menu_feature"},
+            ],
+        ],
+        "parent": "home",
     },
 }
 

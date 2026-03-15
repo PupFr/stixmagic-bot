@@ -11,7 +11,7 @@ DB_FILE = "bot.db"
 app = Flask(__name__, static_folder="static")
 
 API_KEY = os.environ.get("STIXMAGIC_API_KEY", "")
-API_VERSION = "1.0"
+API_VERSION = "1.1"
 PAGE_SIZE = 20
 
 
@@ -368,6 +368,243 @@ def user_settings_update(user_id):
         "user_id": user_id,
         "mask_inverted": bool(row["mask_inverted"]) if row else False,
     })
+
+
+# ── CATALOG (public) ──────────────────────────────────────────
+
+def _catalog_row_to_dict(row) -> dict:
+    r = dict(row)
+    return {
+        "id": r.get("id"),
+        "name": r.get("name"),
+        "title": r.get("title"),
+        "description": r.get("description", ""),
+        "type": r.get("type", "image"),
+        "public": bool(r.get("public", 1)),
+        "safe": bool(r.get("safe", 1)),
+        "likes": r.get("likes", 0),
+        "dislikes": r.get("dislikes", 0),
+        "view_count": r.get("view_count", 0),
+        "added_at": r.get("added_at"),
+        "link": f"https://t.me/addstickers/{r['name']}",
+    }
+
+
+@app.route("/api/catalog/packs")
+def catalog_packs():
+    """
+    GET /api/catalog/packs?type=popular|trending|new|search&q=query&limit=25&skip=0
+    Returns catalog packs. No API key required (public endpoint).
+    """
+    sort = request.args.get("type", "popular")
+    if sort not in ("popular", "trending", "new", "search"):
+        sort = "popular"
+    query = request.args.get("q", "").strip()
+    try:
+        limit = min(100, max(1, int(request.args.get("limit", 25))))
+    except ValueError:
+        limit = 25
+    try:
+        skip = max(0, int(request.args.get("skip", 0)))
+    except ValueError:
+        skip = 0
+
+    conn = get_db()
+    if sort == "popular":
+        sql = (
+            "SELECT * FROM catalog_packs WHERE public = 1 "
+            "ORDER BY likes DESC LIMIT ? OFFSET ?"
+        )
+        rows = conn.execute(sql, (limit, skip)).fetchall()
+        count_row = conn.execute("SELECT COUNT(*) FROM catalog_packs WHERE public = 1").fetchone()
+    elif sort == "trending":
+        sql = (
+            "SELECT * FROM catalog_packs WHERE public = 1 "
+            "ORDER BY view_count DESC, likes DESC LIMIT ? OFFSET ?"
+        )
+        rows = conn.execute(sql, (limit, skip)).fetchall()
+        count_row = conn.execute("SELECT COUNT(*) FROM catalog_packs WHERE public = 1").fetchone()
+    elif sort == "new":
+        sql = (
+            "SELECT * FROM catalog_packs WHERE public = 1 "
+            "ORDER BY added_at DESC LIMIT ? OFFSET ?"
+        )
+        rows = conn.execute(sql, (limit, skip)).fetchall()
+        count_row = conn.execute("SELECT COUNT(*) FROM catalog_packs WHERE public = 1").fetchone()
+    else:
+        if not query:
+            conn.close()
+            return err("Missing required param 'q' for search type", 400, "missing_param")
+        pattern = f"%{query}%"
+        sql = (
+            "SELECT * FROM catalog_packs WHERE public = 1 "
+            "AND (title LIKE ? OR name LIKE ? OR description LIKE ?) "
+            "ORDER BY likes DESC LIMIT ? OFFSET ?"
+        )
+        rows = conn.execute(sql, (pattern, pattern, pattern, limit, skip)).fetchall()
+        count_row = conn.execute(
+            "SELECT COUNT(*) FROM catalog_packs WHERE public = 1 "
+            "AND (title LIKE ? OR name LIKE ? OR description LIKE ?)",
+            (pattern, pattern, pattern),
+        ).fetchone()
+    conn.close()
+
+    total = count_row[0] if count_row else 0
+    packs = [_catalog_row_to_dict(r) for r in rows]
+    return ok({"stickerSets": packs, "totalCount": total, "count": len(packs)})
+
+
+@app.route("/api/catalog/packs/<pack_name>")
+def catalog_pack_detail(pack_name):
+    """GET /api/catalog/packs/<name> — get one catalog pack."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM catalog_packs WHERE name = ? AND public = 1", (pack_name,)
+    ).fetchone()
+    if row:
+        conn.execute(
+            "UPDATE catalog_packs SET view_count = view_count + 1 WHERE name = ?",
+            (pack_name,),
+        )
+        conn.commit()
+    conn.close()
+    if not row:
+        return err("Pack not found in catalog", 404, "not_found")
+    return ok(_catalog_row_to_dict(row))
+
+
+@app.route("/api/catalog/packs/<pack_name>/react", methods=["POST"])
+def catalog_pack_react(pack_name):
+    """
+    POST /api/catalog/packs/<name>/react
+    Body: {"user_id": int, "type": "like"|"dislike"}
+    No API key required (uses user_id from request body).
+    """
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    reaction = data.get("type", "")
+
+    if not user_id or not str(user_id).lstrip("-").isdigit():
+        return err("Missing or invalid user_id", 400, "missing_param")
+    if reaction not in ("like", "dislike"):
+        return err("type must be 'like' or 'dislike'", 400, "invalid_param")
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id FROM catalog_packs WHERE name = ? AND public = 1", (pack_name,)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return err("Pack not found in catalog", 404, "not_found")
+
+    uid = int(user_id)
+    existing = conn.execute(
+        "SELECT reaction FROM catalog_reactions WHERE user_id = ? AND pack_name = ?",
+        (uid, pack_name),
+    ).fetchone()
+
+    if existing:
+        old = existing["reaction"]
+        if old == reaction:
+            conn.execute(
+                "DELETE FROM catalog_reactions WHERE user_id = ? AND pack_name = ?",
+                (uid, pack_name),
+            )
+            if reaction == "like":
+                conn.execute(
+                    "UPDATE catalog_packs SET likes = MAX(0, likes - 1) WHERE name = ?",
+                    (pack_name,),
+                )
+            else:
+                conn.execute(
+                    "UPDATE catalog_packs SET dislikes = MAX(0, dislikes - 1) WHERE name = ?",
+                    (pack_name,),
+                )
+            current = None
+        else:
+            conn.execute(
+                "UPDATE catalog_reactions SET reaction = ? WHERE user_id = ? AND pack_name = ?",
+                (reaction, uid, pack_name),
+            )
+            if reaction == "like":
+                conn.execute(
+                    "UPDATE catalog_packs SET likes = likes + 1, dislikes = MAX(0, dislikes - 1) WHERE name = ?",
+                    (pack_name,),
+                )
+            else:
+                conn.execute(
+                    "UPDATE catalog_packs SET dislikes = dislikes + 1, likes = MAX(0, likes - 1) WHERE name = ?",
+                    (pack_name,),
+                )
+            current = reaction
+    else:
+        conn.execute(
+            "INSERT INTO catalog_reactions (user_id, pack_name, reaction) VALUES (?, ?, ?)",
+            (uid, pack_name, reaction),
+        )
+        if reaction == "like":
+            conn.execute(
+                "UPDATE catalog_packs SET likes = likes + 1 WHERE name = ?",
+                (pack_name,),
+            )
+        else:
+            conn.execute(
+                "UPDATE catalog_packs SET dislikes = dislikes + 1 WHERE name = ?",
+                (pack_name,),
+            )
+        current = reaction
+
+    conn.commit()
+    result_row = conn.execute(
+        "SELECT likes, dislikes FROM catalog_packs WHERE name = ?", (pack_name,)
+    ).fetchone()
+    conn.close()
+
+    return ok({
+        "total": {
+            "like": result_row["likes"] if result_row else 0,
+            "dislike": result_row["dislikes"] if result_row else 0,
+        },
+        "current": current,
+    })
+
+
+@app.route("/api/catalog/packs/<pack_name>/feature", methods=["POST"])
+def catalog_pack_feature(pack_name):
+    """
+    POST /api/catalog/packs/<name>/feature
+    Body: {"user_id": int, "title": str, "description": str, "type": str}
+    Allows a Mini App user to feature a pack in the catalog.
+    """
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    title = str(data.get("title", "")).strip()
+    description = str(data.get("description", "")).strip()
+    pack_type = data.get("type", "image")
+
+    if not user_id or not str(user_id).lstrip("-").isdigit():
+        return err("Missing or invalid user_id", 400, "missing_param")
+    if not title:
+        return err("title is required", 400, "missing_param")
+    if pack_type not in ("image", "animated", "video"):
+        pack_type = "image"
+
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT id FROM catalog_packs WHERE name = ?", (pack_name,)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return ok({"featured": False, "message": "Pack already in catalog"})
+
+    conn.execute(
+        "INSERT INTO catalog_packs (name, title, description, type, added_at, added_by) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (pack_name, title, description, pack_type, int(time.time()), int(user_id)),
+    )
+    conn.commit()
+    conn.close()
+    return ok({"featured": True, "name": pack_name, "title": title}, 201)
 
 
 # ── ERRORS ────────────────────────────────────────────────────

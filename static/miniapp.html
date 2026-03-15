@@ -182,7 +182,7 @@
         /* ── Tabs ───────────────────────────────────── */
         .tabs {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             background: var(--tab-bg);
             border-bottom: 1px solid var(--border);
             position: sticky;
@@ -730,7 +730,7 @@
         /* ── Responsive tweaks ───────────────────────── */
         @media (max-width: 360px) {
             .content { padding: 0.75rem; }
-            .tab-btn { font-size: 0.67rem; }
+            .tab-btn { font-size: 0.62rem; }
         }
 
         @media (min-width: 600px) {
@@ -791,6 +791,11 @@
                 aria-controls="tab-packs" onclick="switchTab('packs', this)">
             <span class="tab-icon">📦</span>
             <span>My Packs</span>
+        </button>
+        <button class="tab-btn" data-tab="catalog" role="tab" aria-selected="false"
+                aria-controls="tab-catalog" onclick="switchTab('catalog', this)">
+            <span class="tab-icon">🔍</span>
+            <span>Catalog</span>
         </button>
     </nav>
 
@@ -916,6 +921,50 @@
             </div>
         </section>
 
+        <!-- TAB 4: Catalog -->
+        <section id="tab-catalog" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-catalog">
+            <div class="section-header" style="background:linear-gradient(135deg,rgba(168,85,247,.18),rgba(0,212,255,.12));border-color:rgba(168,85,247,.3);">
+                🔍 Sticker Catalog
+            </div>
+
+            <div class="info-row">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Discover community sticker packs. Like, add to Telegram, or feature your own!</span>
+            </div>
+
+            <!-- Sort + Search bar -->
+            <div style="display:flex;gap:0.45rem;margin-bottom:0.85rem;flex-wrap:wrap;align-items:center;">
+                <button class="btn btn-ghost catalog-sort-btn active" data-sort="popular" onclick="setCatalogSort('popular',this)" style="font-size:0.75rem;padding:0.3rem 0.7rem;">🔥 Popular</button>
+                <button class="btn btn-ghost catalog-sort-btn" data-sort="trending" onclick="setCatalogSort('trending',this)" style="font-size:0.75rem;padding:0.3rem 0.7rem;">📈 Trending</button>
+                <button class="btn btn-ghost catalog-sort-btn" data-sort="new" onclick="setCatalogSort('new',this)" style="font-size:0.75rem;padding:0.3rem 0.7rem;">🆕 New</button>
+                <input id="catalog-search-input" type="search" placeholder="Search packs…"
+                       style="flex:1;min-width:100px;height:2rem;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text);padding:0 0.6rem;font-size:0.8rem;"
+                       oninput="debounceCatalogSearch(this.value)">
+            </div>
+
+            <!-- Results -->
+            <div id="catalog-list">
+                <div class="state-box">
+                    <div class="spinner"></div>
+                    <p style="margin-top:0.85rem">Loading catalog…</p>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div id="catalog-nav" style="display:none;justify-content:center;align-items:center;gap:0.6rem;margin-top:0.85rem;padding-bottom:0.5rem;">
+                <button class="btn btn-ghost" id="catalog-prev" onclick="catalogPrev()" style="font-size:0.8rem;padding:0.3rem 0.8rem;">◂ Prev</button>
+                <span id="catalog-page-label" style="font-size:0.78rem;color:var(--hint);">1 / 1</span>
+                <button class="btn btn-ghost" id="catalog-next" onclick="catalogNext()" style="font-size:0.8rem;padding:0.3rem 0.8rem;">Next ▸</button>
+            </div>
+
+            <!-- Feature my pack -->
+            <div style="margin-top:1rem;text-align:center;">
+                <button class="btn btn-ghost" onclick="openFeaturePack()" style="font-size:0.78rem;">
+                    <i class="fa-solid fa-upload"></i> Feature my pack
+                </button>
+            </div>
+        </section>
+
     </main>
 
     <!-- Footer -->
@@ -997,7 +1046,7 @@
     window.switchTab = function (name, btnEl) {
         if (name === currentTab) return;
 
-        var tabOrder = ['create', 'add', 'packs'];
+        var tabOrder = ['create', 'add', 'packs', 'catalog'];
         var direction = tabOrder.indexOf(name) > tabOrder.indexOf(currentTab) ? '' : 'slide-left';
 
         // Hide current
@@ -1029,6 +1078,9 @@
 
         if ((name === 'add' || name === 'packs') && !packsLoaded) {
             loadPacks();
+        }
+        if (name === 'catalog' && !catalogLoaded) {
+            loadCatalog();
         }
     };
 
@@ -1284,6 +1336,151 @@
         } else {
             showAlert('Delete pack "' + packName + '"?\nThis action cannot be undone.\n(Sending delete request…)');
             doDelete();
+        }
+    };
+
+    // ── Catalog ──────────────────────────────────────────────────
+    var catalogSort   = 'popular';
+    var catalogPage   = 0;
+    var catalogTotal  = 0;
+    var catalogLoaded = false;
+    var catalogSearchTerm = '';
+    var catalogDebounceTimer = null;
+    var CATALOG_PAGE_SIZE = 10;
+
+    function getTelegramUserId() {
+        try {
+            var user = tg && (tg.initDataUnsafe || {}).user;
+            return user ? user.id : null;
+        } catch (e) { return null; }
+    }
+
+    function setCatalogSort(sort, btnEl) {
+        // Skip reload if already on this sort and no active search is overriding it
+        if (sort === catalogSort && !catalogSearchTerm) return;
+        catalogSort = sort;
+        catalogPage = 0;
+        catalogSearchTerm = '';
+        document.getElementById('catalog-search-input').value = '';
+        document.querySelectorAll('.catalog-sort-btn').forEach(function (b) { b.classList.remove('active'); });
+        if (btnEl) btnEl.classList.add('active');
+        loadCatalog();
+    }
+    window.setCatalogSort = setCatalogSort;
+
+    function debounceCatalogSearch(val) {
+        clearTimeout(catalogDebounceTimer);
+        catalogDebounceTimer = setTimeout(function () {
+            catalogSearchTerm = val.trim();
+            catalogPage = 0;
+            if (catalogSearchTerm) {
+                document.querySelectorAll('.catalog-sort-btn').forEach(function (b) { b.classList.remove('active'); });
+            }
+            loadCatalog();
+        }, 350);
+    }
+    window.debounceCatalogSearch = debounceCatalogSearch;
+
+    function loadCatalog() {
+        var listEl = document.getElementById('catalog-list');
+        listEl.innerHTML = '<div class="state-box"><div class="spinner"></div><p style="margin-top:0.85rem">Loading…</p></div>';
+        document.getElementById('catalog-nav').style.display = 'none';
+
+        var type = catalogSearchTerm ? 'search' : catalogSort;
+        var url  = '/api/catalog/packs?type=' + encodeURIComponent(type) +
+                   '&limit=' + CATALOG_PAGE_SIZE +
+                   '&skip=' + (catalogPage * CATALOG_PAGE_SIZE);
+        if (catalogSearchTerm) url += '&q=' + encodeURIComponent(catalogSearchTerm);
+
+        fetch(url)
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (!json.ok) { renderCatalogError('Server error'); return; }
+                var data   = json.data;
+                var packs  = data.stickerSets || [];
+                catalogTotal  = data.totalCount || 0;
+                catalogLoaded = true;
+                renderCatalogPacks(packs);
+                renderCatalogNav();
+            })
+            .catch(function () { renderCatalogError('Network error. Please try again.'); });
+    }
+
+    function renderCatalogError(msg) {
+        document.getElementById('catalog-list').innerHTML =
+            '<div class="state-box"><span class="state-icon">⚠️</span><p>' + escHtml(msg) + '</p></div>';
+    }
+
+    function renderCatalogPacks(packs) {
+        var el = document.getElementById('catalog-list');
+        if (!packs.length) {
+            el.innerHTML = '<div class="state-box"><span class="state-icon">🔍</span>' +
+                '<p>No packs found.<br>Be the first to <strong>feature</strong> one!</p></div>';
+            return;
+        }
+        var uid = getTelegramUserId();
+        var html = '<div class="pack-list">';
+        packs.forEach(function (p, idx) {
+            var link = 'https://t.me/addstickers/' + encodeURIComponent(p.name);
+            html +=
+                '<div class="pack-card" style="animation-delay:' + (idx * 45) + 'ms">' +
+                '<div class="pack-card-icon">🔍</div>' +
+                '<div class="pack-card-info" style="min-width:0">' +
+                    '<div class="pack-card-title">' + escHtml(p.title || p.name) + '</div>' +
+                    '<div class="pack-card-name">' + escHtml(p.name) + '</div>' +
+                    (p.description ? '<div style="font-size:0.72rem;color:var(--hint);margin-top:0.15rem">' + escHtml(p.description) + '</div>' : '') +
+                    '<div style="font-size:0.7rem;color:var(--hint);margin-top:0.2rem">👁 ' + (p.view_count||0) + '  👍 ' + (p.likes||0) + '  👎 ' + (p.dislikes||0) + '</div>' +
+                '</div>' +
+                '<div class="pack-card-actions" style="flex-shrink:0">' +
+                    '<button class="btn btn-icon btn-ghost" title="Like" aria-label="Like this pack" onclick="catalogReact(\'' + escJs(p.name) + '\',\'like\',this)" style="font-size:0.85rem">👍</button>' +
+                    '<button class="btn btn-icon btn-ghost" title="Dislike" aria-label="Dislike this pack" onclick="catalogReact(\'' + escJs(p.name) + '\',\'dislike\',this)" style="font-size:0.85rem">👎</button>' +
+                    '<a class="btn btn-icon btn-ghost" href="' + escHtml(link) + '" target="_blank" rel="noopener noreferrer" title="Add to Telegram" aria-label="Add sticker pack to Telegram" style="text-decoration:none;font-size:0.85rem">➕</a>' +
+                '</div>' +
+                '</div>';
+        });
+        html += '</div>';
+        el.innerHTML = html;
+    }
+
+    function renderCatalogNav() {
+        var totalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
+        var navEl = document.getElementById('catalog-nav');
+        var prevBtn = document.getElementById('catalog-prev');
+        var nextBtn = document.getElementById('catalog-next');
+        document.getElementById('catalog-page-label').textContent = (catalogPage + 1) + ' / ' + totalPages;
+        prevBtn.disabled = catalogPage === 0;
+        nextBtn.disabled = catalogPage >= totalPages - 1;
+        navEl.style.display = totalPages > 1 ? 'flex' : 'none';
+    }
+
+    window.catalogPrev = function () { if (catalogPage > 0) { catalogPage--; loadCatalog(); } };
+    window.catalogNext = function () { catalogPage++; loadCatalog(); };
+
+    window.catalogReact = function (packName, reaction, btn) {
+        var uid = getTelegramUserId();
+        if (!uid) { showAlert('Unable to react: user authentication failed.'); return; }
+        fetch('/api/catalog/packs/' + encodeURIComponent(packName) + '/react', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: uid, type: reaction })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (json.ok) {
+                    var total = json.data.total;
+                    showAlert((reaction === 'like' ? '👍 ' : '👎 ') + 'Thanks! Likes: ' + total.like + ' · Dislikes: ' + total.dislike);
+                    loadCatalog();
+                }
+            })
+            .catch(function () { /* silent */ });
+    };
+
+    window.openFeaturePack = function () {
+        // Open the bot with /feature command to publish a pack to the catalog
+        if (tg && tg.openTelegramLink) {
+            tg.openTelegramLink('https://t.me/stixmagicbot?start=feature');
+        } else {
+            showAlert('Send /feature to @stixmagicbot to publish your pack to the catalog!');
         }
     };
 
