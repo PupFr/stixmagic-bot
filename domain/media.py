@@ -154,7 +154,8 @@ def convert_video_to_sticker(file_bytes: io.BytesIO) -> io.BytesIO | None:
                 "-pix_fmt", "yuva420p",
                 out_path,
             ]
-            return subprocess.run(cmd, capture_output=True, timeout=60)
+            # 30 s is generous for a 3-second VP9 clip on typical hardware
+            return subprocess.run(cmd, capture_output=True, timeout=30)
 
         result = _run_ffmpeg("200k", tmp_out_path)
 

@@ -53,7 +53,9 @@ def rate_limit(limit: int = 60, window: float = 60.0):
     def decorator(f):
         @wraps(f)
         def wrapped(*args, **kwargs):
-            ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+            # Use the first IP in X-Forwarded-For to handle proxy chains correctly
+            forwarded_for = request.headers.get("X-Forwarded-For", "")
+            ip = (forwarded_for.split(",")[0].strip() or request.remote_addr or "unknown")
             key = f"{ip}:{f.__name__}"
             if not _limiter.is_allowed(key, limit, window):
                 return err("Too many requests — please slow down.", 429, "rate_limited")

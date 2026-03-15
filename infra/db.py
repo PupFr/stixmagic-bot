@@ -110,7 +110,12 @@ def delete_pack(user_id: int, name: str) -> None:
 
 
 def get_user_packs(user_id: int) -> list[tuple[str, str]]:
-    """Return a list of (name, title) tuples for the given user."""
+    """Return a list of (name, title) tuples for the given user.
+
+    Although db_conn sets row_factory=sqlite3.Row, the list comprehension
+    below explicitly constructs plain tuples so the return type annotation
+    matches callers that unpack with `for name, title in packs`.
+    """
     with db_conn() as conn:
         c = conn.cursor()
         c.execute("SELECT name, title FROM packs WHERE user_id = ?", (user_id,))
