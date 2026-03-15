@@ -24,13 +24,14 @@ from infra.db import (
     get_user_packs,
     init_db,
     is_new_user,
+    log_event,
     set_mask_inverted,
     update_pack_title as update_pack_title_in_db,
 )
 from domain.media import (
-    apply_mask_to_image,
-    convert_to_sticker,
-    convert_video_to_sticker,
+    async_apply_mask_to_image,
+    async_convert_to_sticker,
+    async_convert_video_to_sticker,
     download_file_bytes,
     extract_file_info,
 )
@@ -193,12 +194,12 @@ async def create_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return WAITING_STICKER
 
         if media_type == "image":
-            converted = convert_to_sticker(sticker_file)
+            converted = await async_convert_to_sticker(sticker_file)
             if converted:
                 sticker_file = converted
         elif media_type == "video":
             await progress.edit_text("⚗️ <i>Distilling the animation...</i>", parse_mode="HTML")
-            converted = convert_video_to_sticker(sticker_file)
+            converted = await async_convert_video_to_sticker(sticker_file)
             if converted:
                 sticker_file = converted
 
@@ -212,6 +213,7 @@ async def create_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         add_pack_to_db(user.id, pack_name, title)
+        log_event(user.id, "pack_created", pack_name)
 
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("✦ Inscribe More Stickers", callback_data=f"addto_{pack_name}")],
@@ -364,12 +366,12 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return WAITING_STICKER_ADD
 
         if media_type == "image":
-            converted = convert_to_sticker(sticker_file)
+            converted = await async_convert_to_sticker(sticker_file)
             if converted:
                 sticker_file = converted
         elif media_type == "video":
             await progress.edit_text("⚗️ <i>Distilling the animation...</i>", parse_mode="HTML")
-            converted = convert_video_to_sticker(sticker_file)
+            converted = await async_convert_video_to_sticker(sticker_file)
             if converted:
                 sticker_file = converted
 
@@ -379,6 +381,7 @@ async def addsticker_receive(update: Update, context: ContextTypes.DEFAULT_TYPE)
             name=pack_name,
             sticker=input_sticker
         )
+        log_event(user.id, "sticker_added", pack_name)
 
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("✦ Bind Another", callback_data=f"addto_{pack_name}")],
@@ -494,7 +497,7 @@ async def magic_mask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         source_io = io.BytesIO(source_data)
         inverted = get_mask_inverted(update.effective_user.id)
-        result_webp = apply_mask_to_image(source_io, mask_bytes, inverted=inverted)
+        result_webp = await async_apply_mask_to_image(source_io, mask_bytes, inverted=inverted)
 
         context.user_data['cut_result'] = result_webp.getvalue()
 
@@ -901,25 +904,58 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
 
-    if data == "menu_manage":
-        await manage_stickers(update, context)
-    elif data == "menu_help_detail":
-        await show_help(update, context)
-    elif data == "menu_packs":
-        await show_packs(update, context)
-    elif data == "menu_about":
-        await show_about(update, context)
-    elif data == "settings_mask":
-        await settings_mask(update, context)
-    elif data == "toggle_mask":
-        await toggle_mask(update, context)
+    _dispatch = {
+        "menu_manage": manage_stickers,
+        "menu_help_detail": show_help,
+        "menu_packs": show_packs,
+        "menu_about": show_about,
+        "settings_mask": settings_mask,
+        "toggle_mask": toggle_mask,
+    }
+
+    if data in _dispatch:
+        await _dispatch[data](update, context)
     elif data.startswith("del_"):
         await delete_pack_callback(update, context)
     elif data.startswith("delconfirm_"):
         await delete_pack_confirm(update, context)
 
 
+# ── STATUS COMMAND ────────────────────────────────────────────
+
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin-only /status command: show basic platform health metrics."""
+    import time
+    from infra.db import get_event_counts
+    from infra.db import db_conn
+
+    with db_conn() as conn:
+        users = conn.execute("SELECT COUNT(DISTINCT user_id) FROM packs").fetchone()[0]
+        packs = conn.execute("SELECT COUNT(*) FROM packs").fetchone()[0]
+
+    events = get_event_counts(10)
+    event_lines = "\n".join(f"  {e['event']}: {e['count']}" for e in events) or "  (none)"
+
+    text = (
+        f"⚙ <b>PLATFORM STATUS</b>\n"
+        f"{DIV}\n\n"
+        f"<b>Users with packs:</b> {users}\n"
+        f"<b>Total packs:</b> {packs}\n\n"
+        f"<b>Top events:</b>\n{event_lines}\n\n"
+        f"<i>UTC {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}</i>"
+    )
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+# ── GLOBAL ERROR HANDLER ──────────────────────────────────────
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log all unhandled exceptions raised inside bot handlers."""
+    logger.error("Unhandled exception in update %s", update, exc_info=context.error)
+
+
 # ── MAIN ─────────────────────────────────────────────────────
+
 
 def main():
     raw_token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -953,6 +989,7 @@ def main():
     application.add_handler(CommandHandler("manage", manage_stickers))
     application.add_handler(CommandHandler("help", show_help))
     application.add_handler(CommandHandler("about", show_about))
+    application.add_handler(CommandHandler("status", status))
 
     create_conv = ConversationHandler(
         entry_points=[CommandHandler("create", create_start), CallbackQueryHandler(create_start, pattern="^menu_create$")],
@@ -1003,6 +1040,7 @@ def main():
 
     application.add_handler(CallbackQueryHandler(nav_callback, pattern="^nav:"))
     application.add_handler(CallbackQueryHandler(menu_callback))
+    application.add_error_handler(error_handler)
 
     from api import run_api
     web_thread = threading.Thread(target=run_api, daemon=True)
