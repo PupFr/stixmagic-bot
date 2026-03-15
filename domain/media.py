@@ -6,11 +6,15 @@ Handles:
   • Video / GIF   → VP9 WEBM animated sticker (≤ 256 KB, max 3 s, 512 px)
   • Mask compositing (B&W mask → transparent cutout)
 
-All functions are pure or near-pure: they receive bytes / BytesIO and
-return BytesIO (or None on failure) so they can be tested without a
-running bot and without touching the file-system beyond temp files.
+All synchronous processing functions are pure / near-pure: they receive
+bytes / BytesIO and return BytesIO (or None on failure) so they can be
+tested without a running bot.
+
+Async wrappers (prefixed `async_`) offload blocking CPU/IO work to a
+thread-pool executor so they never stall the asyncio event loop.
 """
 
+import asyncio
 import io
 import logging
 import os
@@ -108,6 +112,12 @@ def convert_to_sticker(file_bytes: io.BytesIO) -> io.BytesIO | None:
     return output
 
 
+async def async_convert_to_sticker(file_bytes: io.BytesIO) -> io.BytesIO | None:
+    """Async wrapper: runs convert_to_sticker in a thread-pool executor."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, convert_to_sticker, file_bytes)
+
+
 # ── Video / GIF pipeline ──────────────────────────────────────
 
 def convert_video_to_sticker(file_bytes: io.BytesIO) -> io.BytesIO | None:
@@ -120,7 +130,12 @@ def convert_video_to_sticker(file_bytes: io.BytesIO) -> io.BytesIO | None:
       • Audio stripped
       • yuva420p pixel format (transparency support)
       • File size ≤ 256 KB (bitrate stepped down if needed)
+
+    All temp files are cleaned up in a finally block regardless of outcome.
     """
+    tmp_in_path = None
+    tmp_out_path = None
+    tmp_out_path2 = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_in:
             tmp_in.write(file_bytes.getvalue())
@@ -139,6 +154,7 @@ def convert_video_to_sticker(file_bytes: io.BytesIO) -> io.BytesIO | None:
                 "-pix_fmt", "yuva420p",
                 out_path,
             ]
+            # 30 s is generous for a 3-second VP9 clip on typical hardware
             return subprocess.run(cmd, capture_output=True, timeout=30)
 
         result = _run_ffmpeg("200k", tmp_out_path)
@@ -151,24 +167,34 @@ def convert_video_to_sticker(file_bytes: io.BytesIO) -> io.BytesIO | None:
             data = f.read()
 
         if len(data) > 256_000:
-            os.unlink(tmp_out_path)
             tmp_out_path2 = tmp_in_path.replace(".mp4", "_out2.webm")
             _run_ffmpeg("100k", tmp_out_path2)
             if os.path.exists(tmp_out_path2):
                 with open(tmp_out_path2, "rb") as f:
                     data = f.read()
-                os.unlink(tmp_out_path2)
-            tmp_out_path = tmp_out_path2
-
-        os.unlink(tmp_in_path)
-        if os.path.exists(tmp_out_path):
-            os.unlink(tmp_out_path)
 
         return io.BytesIO(data)
 
     except Exception as exc:
         logger.error("Video conversion error: %s", exc)
         return None
+    finally:
+        for path in (tmp_in_path, tmp_out_path, tmp_out_path2):
+            if path and os.path.exists(path):
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+
+
+async def async_convert_video_to_sticker(file_bytes: io.BytesIO) -> io.BytesIO | None:
+    """Async wrapper: runs convert_video_to_sticker in a thread-pool executor.
+
+    This prevents the synchronous ffmpeg subprocess call from blocking the
+    asyncio event loop and delaying other bot updates.
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, convert_video_to_sticker, file_bytes)
 
 
 # ── Mask compositing ──────────────────────────────────────────
@@ -211,3 +237,15 @@ def apply_mask_to_image(
 
     output.seek(0)
     return output
+
+
+async def async_apply_mask_to_image(
+    source_bytes: io.BytesIO,
+    mask_bytes: io.BytesIO,
+    inverted: bool = False,
+) -> io.BytesIO:
+    """Async wrapper: runs apply_mask_to_image in a thread-pool executor."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, apply_mask_to_image, source_bytes, mask_bytes, inverted)
+
+

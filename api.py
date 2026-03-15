@@ -2,9 +2,12 @@ import os
 import re
 import sqlite3
 import time
+import uuid
 import asyncio
+import collections
+import threading
 from functools import wraps
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, g
 
 DB_FILE = "bot.db"
 
@@ -13,6 +16,52 @@ app = Flask(__name__, static_folder="static")
 API_KEY = os.environ.get("STIXMAGIC_API_KEY", "")
 API_VERSION = "1.0"
 PAGE_SIZE = 20
+
+# Configurable CORS origin – defaults to "*" for development; set
+# CORS_ALLOW_ORIGIN in production (e.g. "https://stixmagic.com").
+CORS_ORIGIN = os.environ.get("CORS_ALLOW_ORIGIN", "*")
+
+
+# ── Simple in-memory rate limiter ─────────────────────────────
+
+class _RateLimiter:
+    """Sliding-window rate limiter keyed by (IP, endpoint).
+
+    Thread-safe; uses a deque per key to track request timestamps.
+    """
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._windows: dict[str, collections.deque] = collections.defaultdict(collections.deque)
+
+    def is_allowed(self, key: str, limit: int, window: float) -> bool:
+        now = time.monotonic()
+        cutoff = now - window
+        with self._lock:
+            dq = self._windows[key]
+            while dq and dq[0] < cutoff:
+                dq.popleft()
+            if len(dq) >= limit:
+                return False
+            dq.append(now)
+            return True
+
+_limiter = _RateLimiter()
+
+
+def rate_limit(limit: int = 60, window: float = 60.0):
+    """Decorator: apply sliding-window rate limiting per client IP."""
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            # Use the first IP in X-Forwarded-For to handle proxy chains correctly
+            forwarded_for = request.headers.get("X-Forwarded-For", "")
+            ip = (forwarded_for.split(",")[0].strip() or request.remote_addr or "unknown")
+            key = f"{ip}:{f.__name__}"
+            if not _limiter.is_allowed(key, limit, window):
+                return err("Too many requests — please slow down.", 429, "rate_limited")
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 def get_db():
@@ -38,20 +87,32 @@ def err(message, status=400, code=None):
     return resp
 
 
-@app.after_request
-def add_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "X-API-Key, Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
-    response.headers["X-API-Version"] = API_VERSION
-    return response
-
-
 @app.before_request
-def handle_preflight():
+def before_request():
+    g.request_id = str(uuid.uuid4())[:8]
+    g.start_time = time.monotonic()
     if request.method == "OPTIONS":
         resp = app.make_default_options_response()
         return resp
+
+
+@app.after_request
+def add_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
+    response.headers["Access-Control-Allow-Headers"] = "X-API-Key, Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+    response.headers["X-API-Version"] = API_VERSION
+    response.headers["X-Request-ID"] = getattr(g, "request_id", "-")
+    elapsed_ms = int((time.monotonic() - getattr(g, "start_time", time.monotonic())) * 1000)
+    app.logger.info(
+        "%s %s %s %dms req=%s",
+        request.method,
+        request.path,
+        response.status_code,
+        elapsed_ms,
+        getattr(g, "request_id", "-"),
+    )
+    return response
 
 
 def require_api_key(f):
@@ -146,6 +207,7 @@ async def _validate_packs_async(token, user_id):
 
 
 @app.route("/api/miniapp/packs")
+@rate_limit(limit=30, window=60.0)
 def miniapp_packs():
     user_id = request.args.get("user_id", "").strip()
     if not user_id or not user_id.isdigit():
@@ -174,6 +236,7 @@ def miniapp_packs():
 
 
 @app.route("/api/miniapp/settings")
+@rate_limit(limit=30, window=60.0)
 def miniapp_settings_get():
     user_id = request.args.get("user_id", "").strip()
     if not user_id or not user_id.isdigit():
@@ -187,6 +250,7 @@ def miniapp_settings_get():
 
 
 @app.route("/api/miniapp/settings", methods=["PATCH"])
+@rate_limit(limit=20, window=60.0)
 def miniapp_settings_patch():
     user_id = request.args.get("user_id", "").strip()
     if not user_id or not user_id.isdigit():
@@ -211,6 +275,7 @@ def miniapp_settings_patch():
 
 
 @app.route("/api/health")
+@rate_limit(limit=60, window=60.0)
 def health():
     conn = get_db()
     try:
@@ -233,6 +298,7 @@ def health():
 
 @app.route("/api/stats")
 @require_api_key
+@rate_limit(limit=30, window=60.0)
 def stats():
     conn = get_db()
     c = conn.cursor()
@@ -252,6 +318,7 @@ def stats():
 
 @app.route("/api/search")
 @require_api_key
+@rate_limit(limit=30, window=60.0)
 def search_packs():
     q = request.args.get("q", "").strip()
     if not q:
@@ -368,6 +435,20 @@ def user_settings_update(user_id):
         "user_id": user_id,
         "mask_inverted": bool(row["mask_inverted"]) if row else False,
     })
+
+
+@app.route("/api/events")
+@require_api_key
+@rate_limit(limit=20, window=60.0)
+def event_stats():
+    """Return top event counts from the event_log for observability."""
+    try:
+        from infra.db import get_event_counts
+        events = get_event_counts(limit=20)
+    except Exception as exc:
+        app.logger.error("event_stats error: %s", exc)
+        return err("Could not read event log", 500, "server_error")
+    return ok(events)
 
 
 # ── ERRORS ────────────────────────────────────────────────────
